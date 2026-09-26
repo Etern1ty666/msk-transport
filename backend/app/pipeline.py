@@ -205,12 +205,23 @@ class Pipeline:
         self.log("ingest", f"Агрегаты записаны в {out.name} за {time.time() - t0:.1f} с")
 
     def _s_normalize(self, art: Artifacts, _f) -> dict:
-        tr = pd.read_csv(DATASET_DIR / "labels" / "labels_day_train.csv", sep=";")
-        te = pd.read_csv(DATASET_DIR / "labels" / "labels_day_test.csv", sep=";")
-        labels = pd.concat([tr, te])
-        labels["date"] = pd.to_datetime(labels.date)
-        labels = labels[labels.date <= HIST_END]
-        self.progress("normalize", 0.3, "labels загружены")
+        tr_path = DATASET_DIR / "labels" / "labels_day_train.csv"
+        te_path = DATASET_DIR / "labels" / "labels_day_test.csv"
+        if tr_path.exists() and te_path.exists():
+            labels = pd.concat([pd.read_csv(tr_path, sep=";"), pd.read_csv(te_path, sep=";")])
+            labels["date"] = pd.to_datetime(labels.date)
+            labels = labels[labels.date <= HIST_END]
+            self.progress("normalize", 0.3, "labels загружены")
+        elif art.raw is not None:
+            # В контейнере нет распакованного dataset.zip, но есть кэш data/raw_hourly.parquet.
+            # Он собран из тех же train.csv/test.csv, поэтому полностью заменяет labels.
+            labels = art.raw.loc[:, ["route", "date", "hour", "boardings"]].copy()
+            labels["date"] = pd.to_datetime(labels.date)
+            labels = labels[labels.date <= HIST_END]
+            self.progress("normalize", 0.3, "labels недоступны — история из кэша агрегатов")
+            self.log("normalize", "Папка labels/ не найдена — история восстановлена из data/raw_hourly.parquet", "warn")
+        else:
+            raise RuntimeError("Нет ни dataset/labels/*.csv, ни data/raw_hourly.parquet — нечем построить историю")
         art.hist = full_grid(labels, HIST_START, HIST_END)
         zeros = int((art.hist.y == 0).sum())
         self.log("normalize", f"labels: {len(labels):,} строк → полная сетка {len(art.hist):,} (дозаполнено нулями {zeros:,})".replace(",", " "))

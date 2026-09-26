@@ -25,7 +25,8 @@ open http://localhost:8000/docs     # Swagger / OpenAPI
 ```
 
 * Сервис стартует **без сети и без сырых CSV**: в образ зашиты кэш агрегатов 10 ГБ валидаций (`data/raw_hourly.parquet`, 0.9 МБ),
-  погода и геометрия OSM. Нужны только `labels/*.csv` и `spravochniki/` из `dataset.zip`.
+  погода и геометрия OSM. `dataset.zip` теперь **не обязателен** — без него история восстанавливается из этого кэша
+  (если `dataset/` распакован, дополнительные слои берутся из `labels/*.csv` и `spravochniki/`).
 * Если сырые `train.csv`/`test.csv` смонтированы — кнопка **«Пересчитать из сырых (10 ГБ)»** на экране «Под капотом»
   прогоняет DuckDB-агрегацию заново (~17 с) с прогрессом по WebSocket.
 * `submission.csv` для платформы: `GET /api/submission` или кнопка на экране «Прогноз и выгрузка».
@@ -291,6 +292,25 @@ flowchart LR
 
 ---
 
+## 11. Деплой (Coolify, один домен)
+
+Для прод-развёртывания используется отдельный compose-файл `docker-compose.coolify.yml`:
+
+* наружу публикуется только `frontend` (nginx, порт 80), хостовые порты 8000/8080 не занимаются;
+* nginx фронтенда сам проксирует `/api`, `/docs`, `/openapi.json` и `/ws` в `backend:8000`, поэтому весь сервис
+  живёт на **одном домене** (Coolify/Traefik терминирует TLS и маршрутизирует по `Host`);
+* история и модель собираются из зашитых в образ данных, без внешнего датасета.
+
+Создание приложения в Coolify (Docker Compose из приватного репозитория по deploy-ключу):
+
+```bash
+# build_pack=dockercompose, docker_compose_location=/docker-compose.coolify.yml,
+# docker_compose_domains -> frontend: https://<домен>
+POST /api/v1/applications/private-deploy-key
+```
+
+---
+
 ## Структура репозитория
 
 ```
@@ -300,5 +320,6 @@ tramflow/
 ├── data/               кэш: агрегаты сырых данных, погода, OSM; submission.csv
 ├── scripts/loadtest.py нагрузочный тест
 ├── submissions/        варианты сабмита
-└── docker-compose.yml
+├── docker-compose.yml          локальный запуск (dataset монтируется)
+└── docker-compose.coolify.yml  прод: один домен, без хостовых портов
 ```

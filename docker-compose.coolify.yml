@@ -1,0 +1,27 @@
+# Развёртывание в Coolify: один публичный домен, обратный прокси внутри — nginx фронтенда.
+# Публикует наружу только frontend (порт 80); /api, /docs и /ws он сам проксирует в backend:8000.
+# Хостовые порты 8000/8080 не публикуются, чтобы не конфликтовать с другими приложениями Coolify.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATASET_DIR: /dataset
+      DATA_DIR: /app/data
+    expose:
+      - "8000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "2", memory: 2g }
+
+  frontend:
+    build:
+      context: ./frontend
+    expose:
+      - "80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
