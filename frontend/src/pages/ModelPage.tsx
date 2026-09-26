@@ -16,6 +16,13 @@ type Model = {
     series: { date: string; actual: number; pred: number }[]; per_route: Record<string, number>; ceiling_note: string
   }
   bpv_target: Record<string, number>
+  ml_compare: MlCompare | null
+}
+type MlCompare = {
+  models: Record<string, string>
+  folds: ({ set: string; title: string; train_rows: number } & Record<string, number | string>)[]
+  mean: Record<string, Record<string, number>>
+  winner: string
 }
 const VARIANTS = ['Полная модель', 'Без погоды', 'Без календаря', 'Без тренда']
 
@@ -33,7 +40,7 @@ export default function ModelPage() {
   return (
     <>
       <div className="grid g4">
-        <Kpi accent label="WAPE-score, бэктест (среднее по 4 окнам)" value={bt.mean['Полная модель']?.toFixed(4)} foot="1 − Σ|y−ŷ| / Σy, больше — лучше" />
+        <Kpi accent label={`WAPE-score, бэктест (среднее по ${bt.folds.length} окнам)`} value={bt.mean['Полная модель']?.toFixed(4)} foot="1 − Σ|y−ŷ| / Σy, больше — лучше" />
         <Kpi label="Baseline организаторов" value="0.48" foot={`прирост +${((bt.mean['Полная модель'] - 0.48) * 100).toFixed(1)} п.п.`} />
         <Kpi label="Потолок постановки" value="≈ 0.93" foot="профиль, подобранный на самом октябре (оракул)" />
         <Kpi label="Лучшее окно" value={Math.max(...bt.folds.map((f) => Number(f['Полная модель']))).toFixed(4)} foot="прогноз на 1 месяц вперёд" />
@@ -110,6 +117,8 @@ export default function ModelPage() {
         </Card>
       </div>
 
+      {d.ml_compare && <MlCompareCard r={d.ml_compare} />}
+
       <Card title="Профиль будней (вт–чт): посадки в час" hint="маршрут × час · основа прогноза">
         <div className="heat" style={{ gridTemplateColumns: `44px repeat(24, 1fr)` }}>
           <div />
@@ -170,5 +179,36 @@ export default function ModelPage() {
         </Card>
       </div>
     </>
+  )
+}
+
+function MlCompareCard({ r }: { r: MlCompare }) {
+  const keys = Object.keys(r.models)
+  const sets = Object.keys(r.mean)
+  return (
+    <Card title="Сравнение с ML-моделями" hint="тот же бэктест: ML обучается только на прошлом до точки прогноза">
+      <table className="t">
+        <thead><tr><th>Модель</th>{sets.map((s) => <th key={s} className="num">{s === '5 окон' ? '5 окон бэктеста' : 'скользящие окна, 56 дн'}</th>)}<th className="num">Δ к профилю</th></tr></thead>
+        <tbody>
+          {keys.map((k) => {
+            const dx = sets.reduce((a, s) => a + r.mean[s][k] - r.mean[s].profile, 0) / sets.length
+            return (
+              <tr key={k} className={k === r.winner ? 'best' : undefined}>
+                <td>{r.models[k]}</td>
+                {sets.map((s) => <td key={s} className="num">{r.mean[s][k].toFixed(4)}</td>)}
+                <td className="num" style={{ color: k === 'profile' ? undefined : dx >= 0 ? 'var(--ok)' : 'var(--bad)' }}>
+                  {k === 'profile' ? '' : `${dx >= 0 ? '+' : ''}${(dx * 100).toFixed(2)} п.п.`}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <div className="note" style={{ marginTop: 8 }}>
+        {r.winner === 'profile'
+          ? 'Профильная модель точнее ML-моделей на обоих наборах окон. ML выучивает сезонные сдвиги прошлых окон (весенний спад, летний провал), которые на новом горизонте не повторяются: в 10 месяцах истории нет ни одного ноября–декабря. ML-контур оставлен как проверяемая альтернатива: python -m app.ml.ml_compare.'
+          : `Лучшая модель на бэктесте: ${r.models[r.winner]}.`}
+        {' '}Окон: {r.folds.length}.
+      </div>
+    </Card>
   )
 }

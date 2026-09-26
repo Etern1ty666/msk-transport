@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import io
+import json
 import math
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
+from app.config import DATA_DIR
 from app.ml import calendar as C
+from app.ml import depots as DEP
 from app.ml import geo as G
 from app.ml.model import ROUTES, Coefficients
 from app.ml.weather import SOURCE as WEATHER_SOURCE
@@ -72,6 +75,7 @@ class Store:
         self.month_keys = np.array([f"{d:%Y-%m}" for d in self.days])
         self.dow = self.days.dayofweek.to_numpy()
         self.target = np.array([self.art.bpv_target.get(r, 110.0) for r in ROUTES])
+        self.depots = DEP.load()  # площадки и выпуск вагонов (data/depots.json)
         self._ycache: dict[tuple, np.ndarray] = {}
 
     def yhat_tensor(self, coef: Coefficients) -> np.ndarray:
@@ -316,6 +320,7 @@ class Store:
                 "ratio": [round(float(v), 3) for v in ratio[i]], "extra": [int(v) for v in extra[i]],
                 "norm": round(float(self.target[i]), 1), "day_total": round(float(y[i].sum())),
                 "peak_hour": int(y[i].argmax()) if y[i].max() > 0 else None,
+                "place": self.depots["route_place"].get(str(r)) if self.depots else None,
             })
         return {
             "date": date, "dow": int(ts.dayofweek), "day_type": cal.day_type, "special": cal.special,
@@ -325,10 +330,23 @@ class Store:
                 "snow": [round(float(v), 1) for v in wd.snowfall],
             },
             "routes": routes,
+            "depots": self._depots_day(veh),
             "network": {"boardings": [round(float(v)) for v in y.sum(0)],
                         "max_ratio": [round(float(v), 3) for v in ratio.max(0)],
                         "problems": [int(v) for v in (ratio >= 1.0).sum(0)]},
         }
+
+    def _depots_day(self, veh: np.ndarray) -> dict | None:
+        """Площадки на сутки: сколько их вагонов на линии по прогнозу выпуска и сколько готовых стоит в парке.
+        Готовые = пиковый выпуск площадки (p90 будней) − вагоны на линии в этот час: в пик ≈ 0, днём и вечером — резерв."""
+        if not self.depots:
+            return None
+        out = {}
+        for p, d in self.depots["places"].items():
+            on_line = np.floor(veh[[self.ridx[r] for r in d["routes"]]]).sum(0)
+            out[p] = {**d, "on_line": [int(v) for v in on_line],
+                      "ready": [int(v) for v in np.maximum(0, d["peak_out"] - on_line)]}
+        return out
 
     def recommendations(self, date: str, coef: Coefficients, min_ratio: float = 1.0) -> list[dict]:
         """Часы и маршруты, где прогноз посадок на вагон выше норматива → сколько вагонов добавить."""
@@ -365,6 +383,8 @@ class Store:
                              "matrix": season.to_numpy().tolist()},
             "backtest": {k: v for k, v in self.art.backtest.items() if k != "hourly"},
             "bpv_target": {str(k): round(v, 1) for k, v in self.art.bpv_target.items()},
+            # результат `python -m app.ml.ml_compare` (LightGBM / MLP против профиля на том же бэктесте)
+            "ml_compare": json.loads(p.read_text()) if (p := DATA_DIR / "ml_compare.json").exists() else None,
         }
 
     def backtest_hourly(self, route: int | None) -> list[dict]:

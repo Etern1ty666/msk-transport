@@ -1008,7 +1008,7 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .okchip.calc b { color: #cffafe; font-weight: 600; }
 .okchip.calc i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(34,211,238,.3); border-top-color: #22d3ee; animation: spin .8s linear infinite; flex: none; }
 @keyframes okBreath { 50% { opacity: .45; } }
-@media (max-width: 720px) { .okchip { justify-self: start; } .okchip span { display: none; } }
+@media (max-width: 720px) { .okchip { justify-self: start; } }
 
 /* производительность: под панелями постоянно анимируется схема/карта — размытие фона пришлось бы пересчитывать каждый кадр
    (заметно тормозит, особенно в Safari и на больших retina-экранах). Панели и так почти непрозрачные — делаем их плотнее без blur */
@@ -1120,34 +1120,12 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 }
 
 /* ветка: номер — наверху, по нажатию список всех веток */
-.sd-pickwrap { position: static; min-width: 0; }
-.sd-pick { padding: 0 10px 0 5px; gap: 8px; }
-.sd-pick .caret { color: var(--muted); transition: transform .2s; }
-.sd-pick.on { background: rgba(148,163,184,.2); }
-.sd-pick.on .caret { transform: rotate(180deg); }
 .rnum.lg { min-width: 30px; height: 24px; border-radius: 7px; font-size: 13px; }
-.sd-drop { position: absolute; z-index: 30; top: 52px; left: 10px; right: 10px; max-height: min(560px, calc(100% - 64px)); overflow: auto;
-  display: grid; gap: 2px; padding: 6px; border-radius: 14px; background: #0f1729; border: 1px solid var(--hair);
-  box-shadow: 0 16px 40px rgba(0,0,0,.5); animation: dropIn .16s ease-out; scrollbar-width: thin; }
 @keyframes dropIn { from { opacity: 0; transform: translateY(-4px); } }
-.sd-drop button { display: grid; grid-template-columns: 30px 1fr auto 16px; gap: 10px; align-items: center; padding: 7px 8px; border: 0; border-radius: 10px;
-  background: none; color: var(--text); cursor: pointer; text-align: left; }
-.sd-drop button:hover { background: rgba(148,163,184,.1); }
-.sd-drop button.on { background: rgba(148,163,184,.14); }
-.sd-drop .dn { min-width: 0; display: grid; gap: 1px; }
-.sd-drop .dn b { font-size: 13px; font-weight: 600; }
-.sd-drop .dn span { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sd-drop .ld { font-size: 12.5px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
-.sd-drop .ck { color: var(--accent); }
-@media (max-width: 720px) { .sd-drop { top: 60px; max-height: calc(100% - 70px); } }
 
 /* шапка v6: ← назад · номер + название ветки (список веток) · XLSX справа; у остановки ниже — соседние станции */
 .sd-bar { gap: 8px; }
 .sd-bar > .seg-solo { flex: none; }
-.sd-pickwrap { flex: 1; min-width: 0; display: flex; }
-.sd-pick { max-width: 100%; min-width: 0; }
-.sd-pick .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sd-pick .caret { flex: none; }
 .sd-xlsx { flex: none; margin-left: auto; height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 11px 0 9px; border-radius: 10px;
   background: rgba(34,197,94,.12); box-shadow: inset 0 0 0 1px rgba(34,197,94,.28); color: #86efac; font-size: 12px; font-weight: 700; letter-spacing: .3px;
   text-decoration: none; white-space: nowrap; transition: background .15s; }
@@ -1299,32 +1277,11 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 /* шапка: конечные ветки — в две строки (откуда ↓ куда), название не прячется за многоточием */
 .sd-bar { height: auto; min-height: 44px; align-items: stretch; }
 .sd-bar > .seg-solo, .sd-bar .sd-xlsx { height: auto; min-height: 44px; }
-.sd-pick { height: auto; min-height: 44px; padding: 5px 10px 5px 6px; }
-.sd-pick .t2 { flex: 1; min-width: 0; display: grid; gap: 1px; text-align: left; line-height: 1.25; }
-.sd-pick .t2 b { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sd-pick .t2 > span { display: flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 500; color: #cbd5e1; min-width: 0; }
-.sd-pick .t2 > span svg { flex: none; color: var(--muted); }
-.sd-pick .t2 > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sd-drop { top: 62px; }
-@media (max-width: 720px) { .sd-drop { top: 70px; } }
 
 /* ================= шапка v7: ← · «12 Трамвай №12 ▾» · XLSX; под ней конечные «откуда ↓ куда» ================= */
 .sd-bar { min-height: 0; height: 36px; align-items: center; }
-.sd-bar > .seg-solo, .sd-bar .sd-xlsx, .sd-pick { height: 36px; min-height: 0; }
-.sd-pickwrap { flex: 0 1 auto; }
-.sd-pick { padding: 0 10px 0 5px; gap: 8px; font-size: 13.5px; font-weight: 700; }
-.sd-route { position: relative; display: grid; gap: 7px; padding: 2px 2px 0 1px; }
-.sd-route .rt { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: start; font-size: 13.5px; line-height: 18px; }
-.sd-route .rt span { color: var(--text); overflow-wrap: anywhere; }
-.sd-route .rt.b span { font-weight: 600; }
-.sd-route .rt i { width: 12px; height: 12px; margin: 3px 1px 0; box-sizing: border-box; border-radius: 50%; border: 3px solid var(--c); background: #0c1322; position: relative; z-index: 1; }
-.sd-route .rt.b i { background: var(--c); border-color: var(--c); }
+.sd-bar > .seg-solo, .sd-bar .sd-xlsx { height: 36px; min-height: 0; }
 /* соединительная линия со стрелкой вниз между конечными */
-.sd-route::before { content: ''; position: absolute; left: 7px; top: 17px; bottom: 15px; width: 2px; margin-left: -1px; border-radius: 1px;
-  background: linear-gradient(var(--c), var(--c)); opacity: .55; }
-.sd-route::after { content: ''; position: absolute; left: 7px; bottom: 14px; margin-left: -4px; border: 4px solid transparent; border-top: 5px solid var(--c); border-bottom: 0; opacity: .8; }
-.sd-drop { top: 56px; }
-@media (max-width: 720px) { .sd-drop { top: 64px; } }
 
 /* плавный переход между остановками: линия, точки и подписи едут дольше и мягче, название под точкой сменяется с проявлением */
 .sd-stop, .sd-line { transition-duration: .6s; transition-timing-function: cubic-bezier(.45, 0, .2, 1); }
@@ -1341,3 +1298,112 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 @keyframes downNudge { 50% { transform: translate(-50%, 2px); } }
 .sd-strip.focus .sd-cur { top: calc(var(--ly) + 25px); }
 @media (prefers-reduced-motion: reduce) { .sd-down { animation: none; } }
+
+/* ---------- вагоны ветки: сколько на линии и откуда взять недостающие ---------- */
+.fleet { display: grid; gap: 8px; margin-top: 4px; }
+.fleet-add { justify-self: start; display: inline-flex; align-items: center; gap: 7px; border: 0; cursor: pointer;
+  border-radius: 999px; padding: 5px 11px 5px 5px; font: inherit; font-size: 13px; color: var(--text);
+  background: rgba(34,211,238,.12); box-shadow: inset 0 0 0 1px rgba(34,211,238,.3); transition: background .15s; }
+.fleet-add:hover, .fleet-add.on { background: rgba(34,211,238,.2); }
+.fleet-add .plus { background: var(--accent); color: #04111d; border-radius: 999px; padding: 2px 9px; font-weight: 700;
+  font-variant-numeric: tabular-nums; }
+.fleet-add .caret { transition: transform .2s; opacity: .8; }
+.fleet-add.on .caret { transform: rotate(180deg); }
+.fleet-src { display: grid; gap: 8px; background: var(--surface, rgba(148,163,184,.08)); border-radius: 10px; padding: 10px 12px;
+  animation: fleetIn .18s ease-out; }
+@keyframes fleetIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.fs-head { font-size: 13px; color: var(--muted); }
+.fs-head b { color: var(--text); }
+.fs-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.fs-ico { width: 28px; height: 24px; border-radius: 7px; display: grid; place-items: center; background: var(--surface-2, rgba(148,163,184,.13)); color: #cbd5e1; }
+.fs-t { display: grid; gap: 1px; min-width: 0; }
+.fs-t b { font-size: 13.5px; font-weight: 600; }
+.fs-t span { font-size: 12px; color: var(--muted); }
+.fs-t em { font-style: normal; font-weight: 600; }
+.fs-take { color: var(--accent); font-size: 17px; font-variant-numeric: tabular-nums; }
+.fs-left { font-size: 12.5px; line-height: 1.4; color: #fca5a5; }
+.fs-note { font-size: 11.5px; line-height: 1.45; color: var(--muted); border-top: 1px solid var(--hair, rgba(148,163,184,.14)); padding-top: 7px; }
+
+/* шапка карточки: номер ветки и вагоны на линии «🚋 ×13» */
+.sd-id { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+
+/* ---------- графическая подача: иконка + число, пояснения — в подсказках ---------- */
+.stat { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 13px; white-space: nowrap; cursor: default; }
+.stat b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat.off b { color: var(--muted); }
+.stat.big { flex-direction: column; align-items: flex-start; gap: 4px; }
+.stat.big b { font-size: 18px; letter-spacing: -.3px; }
+.glyphs { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.sd-title.glyphs { padding: 2px 0 0; }
+.facts.glyph-facts > .stat { background: var(--surface, rgba(148,163,184,.08)); border-radius: 10px; padding: 9px 11px; }
+.ops-side .hero .big { align-items: center; }
+.ops-side .hero .big .stat { margin-left: 2px; }
+.ops-side .hero .big .stat b { color: var(--muted); font-weight: 500; font-size: 14px; letter-spacing: 0; }
+.bigv { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.bigv b { color: var(--text); }
+.hero-info { margin-left: auto; color: var(--muted); display: inline-grid; cursor: help; }
+.hero-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wchip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums; background: var(--surface-2, rgba(148,163,184,.13)); cursor: default; }
+.wchip.ok, .wchip.low, .wchip.mid { color: #86efac; }
+.wchip.high { color: #fdba74; }
+.wchip.crit { color: #fca5a5; }
+.winchip { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.winchip b { font-weight: 700; }
+.ops-side h4.ih { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+/* «откуда взять»: кнопка в строке статуса, список — на всю ширину под ней */
+.fleet { display: contents; }
+.fleet-add { justify-self: auto; margin-left: auto; padding: 4px 9px 4px 4px; }
+.fleet-src { flex-basis: 100%; }
+.fs-head { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fs-head b { color: var(--text); font-size: 15px; }
+.fs-info { margin-left: auto; display: inline-grid; cursor: help; }
+.fs-t { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fs-avail, .fs-load { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.fs-row { cursor: default; }
+.fs-row.far { opacity: .85; }
+.far-ico { color: #fdba74; flex: none; }
+.fs-left { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: help; }
+.fs-left b { font-variant-numeric: tabular-nums; }
+/* плашки на карте */
+.okchip .warn { color: #fdba74; }
+.okchip span { font-variant-numeric: tabular-nums; }
+.okchip .rn { font-style: normal; font-size: 11px; font-weight: 700; color: #fff; border-radius: 5px; padding: 1px 5px; line-height: 16px; }
+.okchip.calc { padding: 0 12px; }
+.coefchip button:first-child { padding-inline: 9px; }
+
+/* заполненность вагона квадратиками: сиденья вдоль бортов, стоячие места в проходе */
+.seatmap { display: block; width: 100%; height: auto; max-width: 420px; }
+.seatmap .body { fill: rgba(148,163,184,.06); stroke: rgba(148,163,184,.38); stroke-width: 1.5; }
+.seatmap .door { fill: var(--panel, #111a2e); }
+.seatmap .cell { fill: rgba(148,163,184,.1); stroke: rgba(148,163,184,.22); stroke-width: 1; transition: fill .35s ease; }
+.seatmap .cell.stand:not(.on) { stroke-dasharray: 2 2; }
+.seatmap .cell.out { fill: #ef4444; fill-opacity: .55; stroke: #ef4444; stroke-dasharray: 2 2; animation: seatOut 1.6s ease-in-out infinite; }
+@keyframes seatOut { 50% { fill-opacity: .25; } }
+.seatmap .cell.on { stroke: rgba(255,255,255,.18); }
+.seatmap.over .body { stroke: #ef4444; animation: seatOver 1.6s ease-in-out infinite; }
+@keyframes seatOver { 50% { stroke-opacity: .35; } }
+
+/* вагоны ветки на линии: по значку на вагон, заливка — заполненность, пунктир — недостающие */
+.fstrip { display: flex; flex-wrap: wrap; gap: 4px 5px; }
+.fcar { width: 30px; height: 22px; flex: none; }
+.fcar .shell { fill: none; stroke: rgba(226,232,240,.55); stroke-width: 1.4; }
+.fcar .pan, .fcar .wheel { fill: none; stroke: rgba(226,232,240,.55); stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.fcar rect[clip-path] { transition: y .35s ease, height .35s ease, fill .35s ease; }
+.fcar.over .shell { stroke: #ef4444; }
+.fcar.ghost .shell, .fcar.ghost .pan, .fcar.ghost .wheel { stroke: var(--accent); stroke-dasharray: 2.5 2; }
+.fcar.ghost { animation: ghostCar 1.8s ease-in-out infinite; }
+@keyframes ghostCar { 50% { opacity: .45; } }
+.fstrip.empty { opacity: .5; }
+
+/* шапка карточки: ← · бейдж · название ветки; XLSX — внизу карточки */
+.sd-id { flex: 1; min-width: 0; }
+.sd-name { font-size: 13.5px; font-weight: 600; line-height: 1.25; color: var(--text); overflow-wrap: anywhere; min-width: 0; }
+.sd-xlsx.wide { margin: 4px 0 0; align-self: flex-start; height: 36px; }
+.fstrip { align-items: center; }
+.fcount { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 4px; color: var(--text); }
+
+.sd-close { flex: none; margin-left: auto; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0;
+  background: none; color: var(--muted); cursor: pointer; border-radius: 8px; transition: color .15s; }
+.sd-close:hover { color: var(--text); }
+.sd-name .t { display: inline-block; }

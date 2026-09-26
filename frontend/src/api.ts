@@ -136,12 +136,19 @@ export const loadColor = (ratio: number) =>
 export type DayRoute = {
   route: number; name: string; color: string; boardings: number[]; vehicles: number[]; ratio: number[]
   extra: number[]; norm: number; day_total: number; peak_hour: number | null
+  place: string | null // площадка (депо), к которой приписан маршрут
+}
+/** Площадка на сутки: парк, пиковый выпуск (p90 будней), вагоны её маршрутов на линии и готовые в парке по часам. */
+export type Depot = {
+  name: string; fleet: number; multi_route: number; peak_out: number; routes: number[]
+  on_line: number[]; ready: number[]
 }
 export type DayView = {
   date: string; dow: number; day_type: 'wd' | 'sat' | 'sun' | 'hol'; special: string; school_holiday: boolean
   is_working_weekend: boolean
   weather: { temp: number[]; precip: number[]; snow: number[] } | null
   routes: DayRoute[]
+  depots: Record<string, Depot> | null
   network: { boardings: number[]; max_ratio: number[]; problems: number[] }
 }
 export const levelOf = (r: number): 'low' | 'mid' | 'high' | 'crit' => (r < 0.7 ? 'low' : r < 1 ? 'mid' : r < 1.2 ? 'high' : 'crit')
@@ -169,4 +176,42 @@ export function problemWindows(r: DayRoute, thr = 1.0) {
   })
   if (cur) out.push(cur)
   return out
+}
+
+/** Донор отдаёт вагоны, только если сам остаётся не выше этой доли норматива во все часы окна. */
+export const DONOR_MAX = 0.85
+export type VehicleSource =
+  | { kind: 'depot'; place: string; name: string; avail: number; take: number; own: boolean }
+  | { kind: 'route'; route: number; color: string; place: string; own: boolean; avail: number; take: number; before: number; after: number }
+
+/** Откуда взять `need` вагонов на маршрут `r` в часы from..to: сначала готовые в парке своей площадки,
+ *  затем ветки той же площадки с запасом (вагоны площадки и так ходят по разным её маршрутам), затем другие площадки. */
+export function vehicleSources(r: DayRoute, list: DayRoute[], depots: Record<string, Depot> | null | undefined,
+  from: number, to: number, need: number) {
+  const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i)
+  const cands: VehicleSource[] = []
+  for (const [p, d] of Object.entries(depots ?? {})) {
+    const avail = Math.min(...hours.map((h) => d.ready[h]))
+    if (avail > 0) cands.push({ kind: 'depot', place: p, name: d.name, avail, take: 0, own: p === r.place })
+  }
+  for (const x of list) {
+    if (x.route === r.route || !x.place || hours.some((h) => x.vehicles[h] <= 0 || x.extra[h] > 0)) continue
+    const avail = Math.min(...hours.map((h) => Math.floor(Math.floor(x.vehicles[h]) - x.boardings[h] / (DONOR_MAX * x.norm))))
+    if (avail <= 0) continue
+    const before = Math.max(...hours.map((h) => x.ratio[h]))
+    cands.push({ kind: 'route', route: x.route, color: x.color, place: x.place, own: x.place === r.place, avail, take: 0, before, after: before })
+  }
+  const rank = (s: VehicleSource) => (s.own ? 0 : 2) + (s.kind === 'depot' ? 0 : 1)
+  cands.sort((a, b) => rank(a) - rank(b) || b.avail - a.avail)
+  let left = need
+  for (const s of cands) {
+    if (left <= 0) break
+    s.take = Math.min(s.avail, left)
+    left -= s.take
+    if (s.kind === 'route') {
+      const x = list.find((q) => q.route === s.route)!
+      s.after = Math.max(...hours.map((h) => x.boardings[h] / ((Math.floor(x.vehicles[h]) - s.take) * x.norm)))
+    }
+  }
+  return { sources: cands.filter((s) => s.take > 0), spare: cands.filter((s) => s.take === 0).slice(0, 3), left: Math.max(0, left) }
 }

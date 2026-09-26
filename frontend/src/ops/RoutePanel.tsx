@@ -1,11 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowLeft, Check, ChevronDown, FileSpreadsheet, MousePointerClick } from 'lucide-react'
+import { ArrowDown, ArrowLeftRight, ChartPie, Clock, FileSpreadsheet, Info, ListOrdered, ShieldCheck, Sigma, TrendingUp, TriangleAlert, Users, X } from 'lucide-react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
-import { exportUrl, fmt, LEVEL_COLORS, LEVEL_TITLE, levelOf, problemWindows, type DayRoute, type RouteGeo, type Stop } from '../api'
+import { exportUrl, fmt, LEVEL_COLORS, LEVEL_TITLE, levelOf, problemWindows, type DayRoute, type Depot, type RouteGeo, type Stop } from '../api'
 import { axis, tooltipStyle, useApp } from '../components'
+import Fleet, { TramSide } from './Fleet'
+import { hspan, Stat } from './Glyphs'
+import FleetStrip from './FleetStrip'
 
 type Props = {
-  route: DayRoute; geo?: RouteGeo; allGeo: RouteGeo[]; list: DayRoute[]; date: string; hour: number; stopId: string | null
+  route: DayRoute; geo?: RouteGeo; allGeo: RouteGeo[]; list: DayRoute[]; depots?: Record<string, Depot> | null
+  date: string; hour: number; stopId: string | null
   keys: boolean // ↑/↓ листают, пока поверх карты ничего не открыто
   onClose: () => void; onHour: (h: number) => void; onStop: (id: string | null) => void
   onRoute: (route: number, stopId: string | null) => void
@@ -17,8 +21,6 @@ const span = (w: { from: number; to: number }) => `${hh(w.from)}–${String(w.to
 const dist = (a: Stop, b: Stop) => Math.hypot((a.lon - b.lon) * 62_600, (a.lat - b.lat) * 111_200)
 // в данных кавычки вперемешку: «Метро "ВДНХ"» и «Метро «ВДНХ»» — показываем единообразно ёлочками
 const nice = (s: string) => s.replace(/"([^"]*)"/g, '«$1»')
-const plural = (n: number, one: string, few: string, many: string) =>
-  n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many
 const meters = (m: number) => (m < 60 ? 'здесь' : `≈${Math.round(m / 10) * 10} м`)
 
 // остановка у метро / МЦК / МЦД: «Метро «ВДНХ»» → { kind: 'М', name: 'ВДНХ' }
@@ -131,7 +133,7 @@ function StopStrip({ stops, color, sel, onPick }: { stops: Stop[]; color: string
   )
 }
 
-export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, stopId, keys, onClose, onHour, onStop, onRoute }: Props) {
+export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, hour, stopId, keys, onClose, onHour, onStop, onRoute }: Props) {
   const { coef } = useApp()
   const on = r.vehicles[hour] > 0
   const lvl = levelOf(r.ratio[hour])
@@ -172,68 +174,21 @@ export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, st
   const body = useRef<HTMLDivElement>(null)
   useEffect(() => { body.current?.scrollTo({ top: 0 }) }, [r.route, stop == null])
 
-  // выпадающий список всех веток — по нажатию на номер ветки в шапке
-  const [pick, setPick] = useState(false)
-  const pickRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { setPick(false) }, [r.route, stop == null])
-  useEffect(() => {
-    if (!pick) return
-    const down = (e: MouseEvent) => { if (!pickRef.current?.contains(e.target as Node)) setPick(false) }
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setPick(false) } }
-    window.addEventListener('mousedown', down)
-    window.addEventListener('keydown', esc, true)
-    return () => { window.removeEventListener('mousedown', down); window.removeEventListener('keydown', esc, true) }
-  }, [pick])
-  const metro = stops.filter((s) => railOf(s.name)).length
-
   const xlsx = exportUrl({ format: 'xlsx', horizon: 'day', date, route: r.route, ...(stop ? { stop_id: stop.stop_id } : {}), ...coef })
 
-  // ---------- шапка: ← назад · номер и название ветки (список всех веток) · выгрузка XLSX ----------
+  // ---------- шапка: номер и название ветки · закрыть ----------
   const head = (
     <div className="sd-top">
       <div className="sd-bar">
-        <button className="seg-solo" onClick={() => (stop ? onStop(null) : onClose())} title={stop ? 'Ко всей ветке (Esc)' : 'Закрыть (Esc)'}><ArrowLeft size={17} /></button>
-        <div className="sd-pickwrap" ref={pickRef}>
-          <button className={`sd-back sd-pick ${pick ? 'on' : ''}`} onClick={() => setPick(!pick)} title={`Трамвай №${r.route}: ${terminals} — выбрать другую ветку`}>
-            <span className="rnum lg" style={{ background: r.color }}>{r.route}</span><span className="t">Трамвай №{r.route}</span><ChevronDown size={15} className="caret" />
-          </button>
-          {pick && (
-            <div className="sd-drop">
-              {list.map((x) => {
-                const g = allGeo.find((q) => q.route === x.route)
-                const xon = x.vehicles[hour] > 0, xl = levelOf(x.ratio[hour])
-                return (
-                  <button key={x.route} className={x.route === r.route ? 'on' : ''} onClick={() => { setPick(false); if (x.route !== r.route || stop) onRoute(x.route, null) }}>
-                    <span className="rnum lg" style={{ background: g?.color ?? x.color }}>{x.route}</span>
-                    <span className="dn"><b>Трамвай №{x.route}</b><span>{x.name.replace(/^Трамвай \d+: /, '').replace(/\s*=>\s*/, ' → ')}</span></span>
-                    <span className="ld" style={{ color: xon ? LEVEL_COLORS[xl] : undefined }}>{xon ? `${Math.round(x.ratio[hour] * 100)}%` : '—'}</span>
-                    {x.route === r.route ? <Check size={15} className="ck" /> : <i className="ck" />}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-        <a className="sd-xlsx" href={xlsx} title={stop ? `Прогноз остановки «${nice(stop.name)}» на день (XLSX)` : `Прогноз трамвая №${r.route} на день (XLSX)`}>
-          <FileSpreadsheet size={16} /><span>XLSX</span>
-        </a>
-      </div>
-
-
-      {/* конечные — как маршрут на схеме: откуда ↓ куда, целиком, без многоточий */}
-      <div className="sd-route" style={{ ['--c' as string]: r.color }}>
-        <div className="rt a"><i /><span>{nice(termA)}</span></div>
-        {termB && <div className="rt b"><i /><span>{nice(termB)}</span></div>}
+        <span className="sd-id" title={`Трамвай №${r.route}: ${terminals}`}>
+          <span className="rnum lg" style={{ background: r.color }}>{r.route}</span>
+          <span className="sd-name"><span className="t">{nice(termA)}{termB && '\u00a0—'}</span>{termB && <> <span className="t">{nice(termB)}</span></>}</span>
+        </span>
+        <button className="sd-close" onClick={() => (stop ? onStop(null) : onClose())} title={stop ? 'Ко всей ветке (Esc)' : 'Закрыть (Esc)'}
+          aria-label={stop ? 'Ко всей ветке' : 'Закрыть'}><X size={20} /></button>
       </div>
 
       {/* у остановки название — на самой ленте, под указателем; у ветки — сводка по линии */}
-      {!stop && (
-        <div className="sd-title">
-          <div className="n">
-            <span className="note">{`${stops.length} ${plural(stops.length, 'остановка', 'остановки', 'остановок')}${metro ? ` · ${metro} у метро, МЦК и МЦД` : ''}`}</span>
-          </div>
-        </div>
-      )}
 
       {stop && <StopStrip key={r.route} stops={stops} color={r.color} sel={idx} onPick={(i) => onStop(stops[i].stop_id)} />}
     </div>
@@ -260,29 +215,33 @@ export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, st
       <div className="ops-side sd">
         {head}
         <div className="sd-body" ref={body}>
+          <div className="facts glyph-facts">
+            <Stat big icon={Sigma} v={`≈${fmt(r.day_total * stop.weight)}`} tip="Посадок на остановке за сутки" />
+            <Stat big icon={TrendingUp} v={hh(peak)} tip={`Пик на остановке: ≈${fmt(vals[peak])} посадок в час`} />
+            <Stat big icon={ListOrdered} v={`${rank}/${stops.length}`} tip={`${rank}-я из ${stops.length} остановок по посадкам`} />
+          </div>
+
           <div className="hero" style={{ borderColor: `${color}66`, background: `${color}14` }}>
-            <div className="big"><b>≈{fmt(vals[hour])}</b><span>посадок в {span({ from: hour, to: hour })}</span></div>
-            <div className="note">
-              {(stop.weight * 100).toFixed(1)}% потока маршрута. {on
-                ? <>Вагоны №{r.route} в этот час загружены на <b style={{ color }}>{Math.round(r.ratio[hour] * 100)}%</b> ({LEVEL_TITLE[lvl]}).</>
-                : <>Маршрут в этот час не работает.</>}
+            <div className="big">
+              <span className="bigv" title={`≈${fmt(vals[hour])} посадок на остановке в ${span({ from: hour, to: hour })}`}><Users size={22} /><b>≈{fmt(vals[hour])}</b></span>
+              <Stat icon={Clock} v={hh(hour)} tip="Выбранный час" />
+              <span className="hero-info" title="Оценка: поток маршрута × доля остановки (по OpenStreetMap; пересадочные узлы и конечные весят больше)"><Info size={15} /></span>
             </div>
+            <div className="glyphs">
+              <Stat icon={ChartPie} v={`${(stop.weight * 100).toFixed(1)}%`} tip="Доля остановки в потоке маршрута" />
+              {on
+                ? <span className="stat" title={`Вагоны №${r.route} в ${hh(hour)}: ${Math.round(r.ratio[hour] * 100)}% норматива — ${LEVEL_TITLE[lvl]}`}>
+                    <TramSide size={14} /><b style={{ color }}>{Math.round(r.ratio[hour] * 100)}%</b></span>
+                : <span className="stat off" title="Маршрут в этот час не работает"><TramSide size={14} /><b>—</b></span>}
+            </div>
+            <FleetStrip vehicles={r.vehicles[hour]} ratio={r.ratio[hour]} extra={0} />
           </div>
 
-          <div className="facts">
-            <div><b>≈{fmt(r.day_total * stop.weight)}</b><span>посадок за сутки</span></div>
-            <div><b>{hh(peak)}</b><span>пик, ≈{fmt(vals[peak])}/ч</span></div>
-            <div><b>{rank}-я</b><span>из {stops.length} по посадкам</span></div>
-          </div>
-
-          <div>
-            <h4>По часам на остановке</h4>
-            <DayBars values={vals} levels={levels} hour={hour} onHour={onHour} unit="пос." />
-          </div>
+          <DayBars values={vals} levels={levels} hour={hour} onHour={onHour} unit="пос." />
 
           {(railList.length > 0 || transfers.length > 0) && (
             <div>
-              <h4>Пересадки рядом</h4>
+              <h4 className="ih" title="Пересадки рядом: метро, МЦК, МЦД и другие трамваи"><ArrowLeftRight size={15} /></h4>
               <div className="sd-list">
                 {railList.map((m) => (
                   <div key={`${m.kind}|${m.name}`} className="toprow static">
@@ -302,7 +261,9 @@ export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, st
             </div>
           )}
 
-          <div className="note">Оценка: поток маршрута × доля остановки (по OpenStreetMap; пересадочные узлы и конечные весят больше).</div>
+          <a className="sd-xlsx wide" href={xlsx} title={stop ? `Прогноз остановки «${nice(stop.name)}» на день (XLSX)` : `Прогноз трамвая №${r.route} на день (XLSX)`}>
+          <FileSpreadsheet size={16} /><span>XLSX</span>
+          </a>
         </div>
       </div>
     )
@@ -316,36 +277,42 @@ export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, st
     <div className="ops-side sd">
       {head}
       <div className="sd-body" ref={body}>
+        <div className="facts glyph-facts">
+          <Stat big icon={Users} v={fmt(r.boardings[hour])} tip={`Посадок в ${hh(hour)}`} />
+          <Stat big icon={Sigma} v={fmt(r.day_total)} tip="Посадок за сутки" />
+          <Stat big icon={TrendingUp} v={r.peak_hour != null ? hh(r.peak_hour) : '—'} tip="Час пик" />
+        </div>
+
         <div className="hero" style={{ borderColor: `${color}66`, background: `${color}14` }}>
-          <div className="big"><b style={{ color }}>{on ? `${Math.round(r.ratio[hour] * 100)}%` : '—'}</b>
-            <span>{on ? LEVEL_TITLE[lvl] : 'нет выпуска'} в {hh(hour)}</span></div>
-          <div className="say">
-            {cur ? <>Добавить <b>+{cur.extra} ваг.</b> на {span(cur)}{on && <> ({fmt(r.vehicles[hour])} → {fmt(r.vehicles[hour] + r.extra[hour])})</>}</>
-              : next ? <>Сейчас в норме. Перегрузка ожидается {span(next)}, нужно <b>+{next.extra} ваг.</b></>
-                : <>За день перегрузок не ожидается.</>}
+          <div className="big">
+            <b style={{ color }} title={on ? `${Math.round(r.ratio[hour] * 100)}% норматива посадок на вагон — ${LEVEL_TITLE[lvl]}` : 'В этот час вагонов на линии нет'}>
+              {on ? `${Math.round(r.ratio[hour] * 100)}%` : '—'}</b>
+            <Stat icon={Clock} v={hh(hour)} tip="Выбранный час" />
+          </div>
+          <FleetStrip vehicles={r.vehicles[hour]} ratio={r.ratio[hour]} extra={on ? r.extra[hour] : 0} />
+          <div className="hero-row">
+            {cur ? <span className={`wchip ${levelOf(cur.max)}`} title={`Перегрузка ${span(cur)}: нужно +${cur.extra} ваг.`}><TriangleAlert size={14} />{hspan(cur)}</span>
+              : next ? <span className={`wchip ${levelOf(next.max)}`} title={`Сейчас в норме. Перегрузка ожидается ${span(next)}, нужно +${next.extra} ваг.`}><TrendingUp size={14} />{hspan(next)}</span>
+                : <span className="wchip ok" title="За день перегрузок не ожидается"><ShieldCheck size={14} />24 ч</span>}
+            <Fleet r={r} list={list} depots={depots} win={cur ?? next ?? null} />
           </div>
         </div>
 
-        <div className="facts">
-          <div><b>{fmt(r.day_total)}</b><span>посадок за сутки</span></div>
-          <div><b>{r.peak_hour != null ? hh(r.peak_hour) : '—'}</b><span>час пик</span></div>
-          <div><b>{fmt(r.boardings[hour])}</b><span>посадок в этот час</span></div>
-        </div>
-
         <div>
-          <h4>Сутки</h4>
           <DayBars values={r.boardings} levels={levels} hour={hour} onHour={onHour} unit="посадок" />
           {wins.length > 0 && (
             <div className="chips" style={{ marginTop: 6 }}>
               {wins.map((w) => (
-                <button key={w.from} className={`winchip ${levelOf(w.max)}`} onClick={() => onHour(w.from)}>{span(w)} · +{w.extra} ваг.</button>
+                <button key={w.from} className={`winchip ${levelOf(w.max)}`} onClick={() => onHour(w.from)}
+                  title={`Перегрузка ${span(w)}: нужно +${w.extra} ваг.`}>
+                  <TriangleAlert size={12} />{hspan(w)}<b>+{w.extra}</b><TramSide size={12} /></button>
               ))}
             </div>
           )}
         </div>
 
         <div>
-          <h4>Больше всего садятся в {hh(hour)}</h4>
+          <h4 className="ih" title={`Больше всего садятся в ${hh(hour)}`}><Users size={15} />{hh(hour)}</h4>
           <div className="sd-list">
             {top.map((s) => {
               const rl = railOf(s.name)
@@ -360,7 +327,9 @@ export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, st
           </div>
         </div>
 
-        <div className="hint"><MousePointerClick size={16} /> Нажмите на остановку на ленте выше или на схеме — покажем прогноз именно по ней</div>
+        <a className="sd-xlsx wide" href={xlsx} title={`Прогноз трамвая №${r.route} на день (XLSX)`}>
+          <FileSpreadsheet size={16} /><span>XLSX</span>
+        </a>
       </div>
     </div>
   )

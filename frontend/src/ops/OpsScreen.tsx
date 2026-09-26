@@ -1,4 +1,4 @@
-import { BrainCircuit, ChevronDown, CircleHelp, LayoutDashboard, Menu, Moon, Scale, Server, ShieldCheck, Table2, TriangleAlert, Workflow, X } from 'lucide-react'
+import { BrainCircuit, ChevronDown, CircleHelp, Gauge, LayoutDashboard, Menu, Moon, Scale, Server, ShieldCheck, Table2, TrendingUp, TriangleAlert, Workflow, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_COEF, fmt, LEVEL_COLORS, levelOf, overLabel, useApi, type DayRoute, type DayView } from '../api'
 import { CoefPanel, useApp } from '../components'
@@ -6,6 +6,7 @@ import OpsMap, { type MapMode } from './OpsMap'
 import Intro from './Intro'
 import RouteBar from './RouteBar'
 import RoutePanel from './RoutePanel'
+import { TramSide } from './Fleet'
 import Timeline from './Timeline'
 
 export const MENU = [
@@ -116,17 +117,18 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     }
   }, [routes, hour])
   const hh = (h: number) => `${String(h).padStart(2, '0')}:00`
+  const routeColor = (n: number) => routes.find((x) => x.route === n)?.color ?? '#64748b'
   const okChip = problems.length === 0 && calm && (
     calc || day.loading
-      ? <div className="okchip calc"><i /><b>Пересчёт прогноза по сети…</b></div>
+      ? <div className="okchip calc" title="Пересчёт прогноза по сети…"><i /></div>
       : calm.night
-        ? <div className="okchip night" title="В этот час трамваи не выходят на линию — прогноз посадок нулевой">
-            <Moon size={14} /><b>Ночной перерыв</b>
-            <span>{calm.firstOut != null ? `выпуск с ${hh(calm.firstOut)}` : 'выпуск утром'}{calm.next ? ` · внимание в ${hh(calm.next.h)} (№${calm.next.route})` : ' · перегрузок не ожидается'}</span>
+        ? <div className="okchip night" title={`Ночной перерыв: трамваи не выходят на линию${calm.firstOut != null ? `, выпуск с ${hh(calm.firstOut)}` : ''}${calm.next ? `; внимание в ${hh(calm.next.h)} (№${calm.next.route})` : '; перегрузок не ожидается'}`}>
+            <Moon size={14} />{calm.firstOut != null && <><TramSide size={14} /><b>{hh(calm.firstOut)}</b></>}
+            {calm.next && <><TriangleAlert size={13} className="warn" /><span>{hh(calm.next.h)}</span><i className="rn" style={{ background: routeColor(calm.next.route) }}>{calm.next.route}</i></>}
           </div>
-        : <div className="okchip" title={`Все ветки ниже норматива. Максимальная загрузка сейчас — ${calm.load}% норматива`}>
-            <ShieldCheck size={14} /><b>Все ветки в норме</b>
-            <span>{calm.vehicles} ваг. на линии · до {calm.load}%{calm.next ? ` · рост к ${hh(calm.next.h)} (№${calm.next.route})` : ' · до конца суток без перегрузок'}</span>
+        : <div className="okchip" title={`Все ветки в норме: ${calm.vehicles} ваг. на линии, максимум ${calm.load}% норматива${calm.next ? `; рост к ${hh(calm.next.h)} (№${calm.next.route})` : '; до конца суток без перегрузок'}`}>
+            <ShieldCheck size={14} /><TramSide size={14} /><b>{calm.vehicles}</b><Gauge size={13} /><span>{calm.load}%</span>
+            {calm.next && <><TrendingUp size={13} className="warn" /><span>{hh(calm.next.h)}</span><i className="rn" style={{ background: routeColor(calm.next.route) }}>{calm.next.route}</i></>}
           </div>
   )
   const badges = (problems.length > 0 || coefChanged || okChip) && (
@@ -134,15 +136,15 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     {okChip}
     {/* на телефоне — одна плашка-сводка, по нажатию раскрывает все бейджи */}
     {problems.length > 0 && (
-      <button className={`probsum ${crit ? 'crit' : ''}`} onClick={() => setProbOpen(!probOpen)}>
-        <TriangleAlert size={14} /> {problems.length} {problems.length % 10 === 1 && problems.length % 100 !== 11 ? 'ветка' : problems.length % 10 >= 2 && problems.length % 10 <= 4 && (problems.length % 100 < 12 || problems.length % 100 > 14) ? 'ветки' : 'веток'} выше нормы
+      <button className={`probsum ${crit ? 'crit' : ''}`} onClick={() => setProbOpen(!probOpen)} title={`Веток выше норматива: ${problems.length}`}>
+        <TriangleAlert size={14} /><b>{problems.length}</b>
         <ChevronDown size={14} className="caret" />
       </button>
     )}
     <div className="probbadges">
       {coefChanged && (
         <span className="coefchip" title="Прогноз скорректирован коэффициентами">
-          <button onClick={() => setShowCoef(true)}><Scale size={13} /> коэффициенты изменены</button>
+          <button onClick={() => setShowCoef(true)} title="Прогноз скорректирован коэффициентами — открыть"><Scale size={14} /></button>
           <button onClick={() => setCoef(DEFAULT_COEF)} title="Сбросить"><X size={13} /></button>
         </span>
       )}
@@ -166,11 +168,11 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [geo, segments, schema, day.data, hour, route, stop, mode, drawer])
   const panelEl = useMemo(() => sel && (
-    <RoutePanel route={sel} geo={geo.find((g) => g.route === sel.route)} allGeo={geo} list={routeList} date={date} hour={hour} stopId={stop} keys={!drawer && !menu && !showCoef}
+    <RoutePanel route={sel} geo={geo.find((g) => g.route === sel.route)} allGeo={geo} list={routeList} depots={day.data?.depots} date={date} hour={hour} stopId={stop} keys={!drawer && !menu && !showCoef}
       onClose={() => select(null)} onHour={(h) => { setPlaying(false); setLive(false); setMinute(h * 60) }} onStop={(s) => setStop(s)}
       onRoute={(r, s) => select(r, s)} />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [sel, geo, routeList, date, hour, stop, drawer, menu, showCoef])
+  ), [sel, geo, routeList, day.data, date, hour, stop, drawer, menu, showCoef])
 
   return (
     <div className={`ops ${sel ? 'side-open' : ''}`}>
