@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+frontend/node_modules/
+frontend/dist/
+data/forecast_components.parquet
+.DS_Store
