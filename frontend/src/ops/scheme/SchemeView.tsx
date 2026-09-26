@@ -511,6 +511,9 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
     const el = box.current
     el?.style.setProperty('--sw', String(strokeOf(k)))
     el?.style.setProperty('--hw', String(Math.max(LANE, 10 / k)))
+    // остановки выбранной ветки не мельче ~4 px (зона нажатия ~11 px) при любом отдалении — по ним легко попасть
+    el?.style.setProperty('--ds', (Math.max(1, 4.5 / (1.05 * k))).toFixed(3))
+    el?.style.setProperty('--hs', (Math.max(1, 11 / (LANE * 0.5 * k))).toFixed(3))
     const p = pinAt.current
     if (pin.current && p) {
       pin.current.style.transform = `translate(${(p[0] * k + x).toFixed(1)}px,${(p[1] * k + y).toFixed(1)}px)`
@@ -972,9 +975,9 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
         {stops.map((s, i) => (
           <g key={`s${i}`} data-stop={i} onPointerEnter={(e) => { if (e.pointerType === 'mouse' && !e.buttons) setHoverStop(i) }} onPointerLeave={() => setHoverStop((h) => (h === i ? null : h))}
             className={`sch-stop ${rc(s.routes)}`}>
-            {s.dots.map((d, j) => <circle key={j} cx={d[0]} cy={d[1]} r={1.05} />)}
+            {s.dots.map((d, j) => <circle key={j} className={`ln-${s.routes[j] ?? ''}`} cx={d[0]} cy={d[1]} r={1.05} />)}
             {/* своя зона нажатия у каждой точки: клик выбирает маршрут этой полосы и остановку */}
-            {s.dots.map((d, j) => <circle key={`h${j}`} className="sch-stop-hit" data-lane={s.routes[j] ?? ''} cx={d[0]} cy={d[1]} r={LANE * 0.5} />)}
+            {s.dots.map((d, j) => <circle key={`h${j}`} className={`sch-stop-hit ln-${s.routes[j] ?? ''}`} data-lane={s.routes[j] ?? ''} cx={d[0]} cy={d[1]} r={LANE * 0.5} />)}
           </g>
         ))}
         {selPt && (
@@ -1030,13 +1033,19 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
     ? `.scheme .sch-lane:not(.r-${f}){opacity:.14}.scheme .sch-stop.hasr:not(.sr-${f}){opacity:.3}`
       + `.scheme .sch-label.hasr:not(.sr-${f}){opacity:.35}.scheme .sch-term:not(.sr-${f}){opacity:.25}`
     : ''
+  // выбранная ветка: её остановки крупнее, с обводкой в цвет линии, и шире зона нажатия (масштаб — --ds/--hs от приближения)
+  const sel = selected ? CSS.escape(`ln-${selected}`) : null
+  const selCss = sel
+    ? `.scheme .sch-stop circle.${sel}:not(.sch-stop-hit){transform:scale(var(--ds,1));stroke:${SCHEME_ROUTES[selected!]?.color ?? '#333'};stroke-width:.42px}`
+      + `.scheme .sch-stop .sch-stop-hit.${sel}{transform:scale(var(--hs,1))}`
+    : ''
   const hoverInfo = hover ? SCHEME_ROUTES[hover] : null
   const hoverData = hover ? day?.routes.find((r) => String(r.route) === hover) : undefined
   const pinName = selected && selectedStop ? geo.find((g0) => String(g0.route) === selected)?.stops.find((s) => s.stop_id === selectedStop)?.name : undefined
 
   return (
     <div ref={box} className={`scheme ${zoomCls} ${focusRoute ? 'focus' : ''} ${debugMode === 'thin' ? 'dbg-thin' : ''}`}>
-      <style>{dimCss}</style>
+      <style>{dimCss + selCss}</style>
       <svg className="sch-layer" width="100%" height="100%"><g ref={gBg}>{bgEl}</g></svg>
       <canvas ref={glowCv} className="sch-layer sch-cv" />
       <svg className="sch-layer sch-fg" width="100%" height="100%"><g ref={gFg}>{fg}</g></svg>

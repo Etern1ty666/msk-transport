@@ -1279,3 +1279,65 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .sd-arr.r::after { left: 0; }
 .sd-cur { top: calc(var(--ly) + 16px); }
 .sd-strip.focus { height: 150px; }
+
+/* ================= лента остановок v5: без стрелок, края затухают там, где за ними ещё есть станции ================= */
+.sd-strip.focus { --ly: 108px; height: 150px; border-radius: 12px; background: rgb(20, 28, 43); box-shadow: inset 0 0 0 1px rgba(148,163,184,.1);
+  -webkit-mask-image: none; mask-image: none; }
+.sd-strip.focus::before, .sd-strip.focus::after { content: ''; position: absolute; z-index: 3; top: 1px; bottom: 1px; width: 64px; pointer-events: none;
+  opacity: 0; transition: opacity .25s; }
+.sd-strip.focus::before { left: 1px; border-radius: 11px 0 0 11px; background: linear-gradient(90deg, rgb(20, 28, 43) 8%, rgba(20, 28, 43, 0)); }
+.sd-strip.focus::after { right: 1px; border-radius: 0 11px 11px 0; background: linear-gradient(270deg, rgb(20, 28, 43) 8%, rgba(20, 28, 43, 0)); }
+.sd-strip.focus.more-l::before, .sd-strip.focus.more-r::after { opacity: 1; }
+.sd-strip.focus .sd-cur { z-index: 4; }
+/* остановки на схеме масштабируются вокруг своего центра */
+.sch-stop circle { transform-box: fill-box; transform-origin: center; }
+.sd-strip.focus { box-shadow: none; border: 1px solid rgba(148,163,184,.1); }
+.sd-strip.focus::before, .sd-strip.focus::after { top: 0; bottom: 0; }
+.sd-strip.focus::before { left: 0; border-radius: 0; }
+.sd-strip.focus::after { right: 0; border-radius: 0; }
+
+/* шапка: конечные ветки — в две строки (откуда ↓ куда), название не прячется за многоточием */
+.sd-bar { height: auto; min-height: 44px; align-items: stretch; }
+.sd-bar > .seg-solo, .sd-bar .sd-xlsx { height: auto; min-height: 44px; }
+.sd-pick { height: auto; min-height: 44px; padding: 5px 10px 5px 6px; }
+.sd-pick .t2 { flex: 1; min-width: 0; display: grid; gap: 1px; text-align: left; line-height: 1.25; }
+.sd-pick .t2 b { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sd-pick .t2 > span { display: flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 500; color: #cbd5e1; min-width: 0; }
+.sd-pick .t2 > span svg { flex: none; color: var(--muted); }
+.sd-pick .t2 > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sd-drop { top: 62px; }
+@media (max-width: 720px) { .sd-drop { top: 70px; } }
+
+/* ================= шапка v7: ← · «12 Трамвай №12 ▾» · XLSX; под ней конечные «откуда ↓ куда» ================= */
+.sd-bar { min-height: 0; height: 36px; align-items: center; }
+.sd-bar > .seg-solo, .sd-bar .sd-xlsx, .sd-pick { height: 36px; min-height: 0; }
+.sd-pickwrap { flex: 0 1 auto; }
+.sd-pick { padding: 0 10px 0 5px; gap: 8px; font-size: 13.5px; font-weight: 700; }
+.sd-route { position: relative; display: grid; gap: 7px; padding: 2px 2px 0 1px; }
+.sd-route .rt { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: start; font-size: 13.5px; line-height: 18px; }
+.sd-route .rt span { color: var(--text); overflow-wrap: anywhere; }
+.sd-route .rt.b span { font-weight: 600; }
+.sd-route .rt i { width: 12px; height: 12px; margin: 3px 1px 0; box-sizing: border-box; border-radius: 50%; border: 3px solid var(--c); background: #0c1322; position: relative; z-index: 1; }
+.sd-route .rt.b i { background: var(--c); border-color: var(--c); }
+/* соединительная линия со стрелкой вниз между конечными */
+.sd-route::before { content: ''; position: absolute; left: 7px; top: 17px; bottom: 15px; width: 2px; margin-left: -1px; border-radius: 1px;
+  background: linear-gradient(var(--c), var(--c)); opacity: .55; }
+.sd-route::after { content: ''; position: absolute; left: 7px; bottom: 14px; margin-left: -4px; border: 4px solid transparent; border-top: 5px solid var(--c); border-bottom: 0; opacity: .8; }
+.sd-drop { top: 56px; }
+@media (max-width: 720px) { .sd-drop { top: 64px; } }
+
+/* плавный переход между остановками: линия, точки и подписи едут дольше и мягче, название под точкой сменяется с проявлением */
+.sd-stop, .sd-line { transition-duration: .6s; transition-timing-function: cubic-bezier(.45, 0, .2, 1); }
+.sd-stop .dot { transition: top .35s, left .35s, width .35s, height .35s, border-width .35s, background-color .35s, border-color .35s, box-shadow .35s; }
+.sd-stop .lb { transition: opacity .35s, color .35s; }
+.sd-stop.on .lb { opacity: 0; }
+.sd-cur b { display: block; animation: curIn .45s cubic-bezier(.2,.8,.2,1); }
+@keyframes curIn { from { opacity: 0; transform: translateY(5px); } }
+/* выбранная станция подписана и сверху (по диагонали, не пропадает), и снизу — к нижнему названию ведёт стрелка */
+.sd-stop.on .lb { opacity: 1; color: #fff; font-weight: 700; }
+.sd-strip.focus { height: 160px; }
+.sd-down { position: absolute; z-index: 4; left: 50%; top: calc(var(--ly) + 9px); transform: translateX(-50%); color: #cbd5e1; line-height: 0; pointer-events: none;
+  animation: downNudge 1.6s ease-in-out infinite; }
+@keyframes downNudge { 50% { transform: translate(-50%, 2px); } }
+.sd-strip.focus .sd-cur { top: calc(var(--ly) + 25px); }
+@media (prefers-reduced-motion: reduce) { .sd-down { animation: none; } }

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, FileSpreadsheet, MousePointerClick } from 'lucide-react'
+import { ArrowDown, ArrowLeft, Check, ChevronDown, FileSpreadsheet, MousePointerClick } from 'lucide-react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { exportUrl, fmt, LEVEL_COLORS, LEVEL_TITLE, levelOf, problemWindows, type DayRoute, type RouteGeo, type Stop } from '../api'
 import { axis, tooltipStyle, useApp } from '../components'
@@ -46,23 +46,11 @@ function DayBars({ values, levels, hour, onHour, unit }: { values: number[]; lev
   )
 }
 
-const GAP = 54 // шаг между остановками на ленте в режиме остановки, px — диагональные подписи в 2–3 строки не наезжают
-const PAD = 14 // левое поле ленты в режиме ветки
-// ширина подписи в px — чтобы у всей ветки лента подстраивалась под самые длинные названия и ничего не обрезалось
-let ctx2d: CanvasRenderingContext2D | null = null
-function textW(t: string, font = '10px Inter, system-ui, sans-serif') {
-  ctx2d ??= document.createElement('canvas').getContext('2d')
-  if (!ctx2d) return t.length * 5.6
-  ctx2d.font = font
-  return ctx2d.measureText(t).width + 24 // + значок М/МЦК
-}
-const labelOf = (name: string) => { const r = railOf(name); return r ? r.name : nice(name) }
+const GAP = 54 // шаг между остановками на ленте, px — диагональные подписи в 2–3 строки не наезжают
 
-/** Лента остановок — как лента времени: в режиме остановки указатель неподвижен в центре, под ним едет линия маршрута
- *  (перетаскивание, колесо, клик). В режиме ветки — вся линия целиком. Столбики — сколько садится на остановке в выбранный час. */
-function StopStrip({ stops, color, values, sel, onPick }: {
-  stops: Stop[]; color: string; values: number[]; sel: number; onPick: (i: number) => void
-}) {
+/** Лента остановок — как табло над дверьми в метро: выбранная станция по центру и подписана снизу, пройденная часть линии
+ *  в цвете ветки, следующая станция мигает. Листается перетаскиванием, колесом и кликом; края затухают — там ещё станции. */
+function StopStrip({ stops, color, sel, onPick }: { stops: Stop[]; color: string; sel: number; onPick: (i: number) => void }) {
   const box = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(0)
   const [drag, setDrag] = useState(0) // смещение пальцем/мышью, px
@@ -75,30 +63,10 @@ function StopStrip({ stops, color, values, sel, onPick }: {
     return () => ro.disconnect()
   }, [])
   const n = stops.length
-  const focus = sel >= 0
-  // при переходе ветка ↔ остановка лента сразу встаёт на выбранную станцию, без проезда
-  // (ширина ленты при этом меняется — появляются стрелки; перемеряем до отрисовки и пару кадров держим без анимации)
-  const prevFocus = useRef(focus)
-  const [snapping, setSnapping] = useState(false)
-  const snap = snapping || prevFocus.current !== focus
-  useLayoutEffect(() => {
-    if (prevFocus.current === focus) return
-    prevFocus.current = focus
-    setW(box.current!.clientWidth)
-    setSnapping(true)
-    let raf = requestAnimationFrame(() => { raf = requestAnimationFrame(() => setSnapping(false)) })
-    return () => cancelAnimationFrame(raf)
-  }, [focus])
-  // у всей ветки: подписи в одну строку под 45°; правое поле — под подпись последней станции, высота — под самую длинную
-  const padR = focus || !n ? PAD : Math.max(PAD, textW(labelOf(stops[n - 1].name)) * 0.71 + 12)
-  const gap = focus ? GAP : n > 1 ? (w - PAD - padR) / (n - 1) : 0
-  const x = (i: number) => (focus ? w / 2 + (i - sel) * gap + drag : n > 1 ? PAD + i * gap : w / 2)
-  const top = Math.max(1e-9, ...values)
-  // подписи по диагонали: у остановки — каждая; на всей ветке — через одну-две, чтобы не наезжали друг на друга
-  const every = focus ? 1 : Math.max(1, Math.ceil(14 / Math.max(1, gap * 0.71)))
-  const shown = (i: number): boolean => (focus ? i !== sel : i === n - 1 || (i % every === 0 && n - 1 - i >= every))
-  const rise = focus ? 0 : Math.max(40, ...stops.map((s, i) => (shown(i) ? textW(labelOf(s.name)) * 0.71 : 0)))
-  const at = (px: number) => Math.max(0, Math.min(n - 1, Math.round(focus ? sel + (px - w / 2 - drag) / gap : (px - PAD) / (gap || 1))))
+  const x = (i: number) => w / 2 + (i - sel) * GAP + drag
+  const at = (px: number) => Math.max(0, Math.min(n - 1, Math.round(sel + (px - w / 2 - drag) / GAP)))
+  // затухание только с той стороны, где за краем ещё есть станции
+  const moreL = x(0) < 0, moreR = x(n - 1) > w
 
   // колесо/тачпад над лентой — листаем остановки по одной
   const acc = useRef(0)
@@ -107,7 +75,6 @@ function StopStrip({ stops, color, values, sel, onPick }: {
   useEffect(() => {
     const el = box.current!
     const wheel = (e: WheelEvent) => {
-      if (!focus) return
       e.preventDefault()
       acc.current += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
       if (Math.abs(acc.current) < 50) return
@@ -117,19 +84,17 @@ function StopStrip({ stops, color, values, sel, onPick }: {
     }
     el.addEventListener('wheel', wheel, { passive: false })
     return () => el.removeEventListener('wheel', wheel)
-  }, [focus, sel, n])
+  }, [sel, n])
 
+  const cur = railOf(stops[sel].name)
   return (
-    <div className={`sd-stripwrap ${focus ? 'focus' : ''}`}>
-    {focus && <button className="sd-arr l" disabled={sel <= 0} onClick={() => onPick(sel - 1)} title={sel > 0 ? nice(stops[sel - 1].name) : 'Начало линии'}><ChevronLeft size={18} /></button>}
-    <div ref={box} className={`sd-strip ${focus ? 'focus' : ''} ${(d.current && drag) || snap ? 'dragging' : ''}`}
-      style={focus ? undefined : { ['--ly' as string]: `${Math.round(rise + 20)}px`, height: Math.round(rise + 46) }}
+    <div ref={box} className={`sd-strip focus ${moreL ? 'more-l' : ''} ${moreR ? 'more-r' : ''} ${d.current && drag ? 'dragging' : ''}`}
       onPointerDown={(e) => { e.preventDefault(); (e.target as Element).setPointerCapture?.(e.pointerId); d.current = { x: e.clientX, moved: 0 } }}
       onPointerMove={(e) => {
         const s = d.current
         if (!s) return
         s.moved += Math.abs(e.clientX - s.x)
-        if (focus && s.moved > 4) { const dx = e.clientX - s.x; setDrag((v) => Math.max(-(n - 1 - sel) * gap, Math.min(sel * gap, v + dx))) }
+        if (s.moved > 4) { const dx = e.clientX - s.x; setDrag((v) => Math.max(-(n - 1 - sel) * GAP, Math.min(sel * GAP, v + dx))) }
         s.x = e.clientX
       }}
       onPointerUp={(e) => {
@@ -137,39 +102,31 @@ function StopStrip({ stops, color, values, sel, onPick }: {
         d.current = null
         if (!s) return
         const r = box.current!.getBoundingClientRect()
-        const i = s.moved > 4 && focus ? at(w / 2) : at(e.clientX - r.left)
+        const i = s.moved > 4 ? at(w / 2) : at(e.clientX - r.left)
         setDrag(0)
         if (i !== sel) onPick(i)
       }}
       onPointerCancel={() => { d.current = null; setDrag(0) }}>
-      {focus && <>
-        {/* выбранная станция — горизонтально под точкой, как на табло над дверьми в метро */}
-        <div className="sd-cur">
-          <b>{railOf(stops[sel].name) && <em className={railOf(stops[sel].name)!.kind === 'М' ? 'm' : 'd'}>{railOf(stops[sel].name)!.kind}</em>}{nice(stops[sel].name)}</b>
-        </div>
-      </>}
+      {/* выбранная станция — горизонтально под точкой */}
+      <div className="sd-down"><ArrowDown size={13} strokeWidth={2.5} /></div>
+      <div className="sd-cur">
+        <b key={sel}>{cur && <em className={cur.kind === 'М' ? 'm' : 'd'}>{cur.kind}</em>}{nice(stops[sel].name)}</b>
+      </div>
       {w > 0 && n > 0 && <>
-        {/* как в метро: пройденная часть линии — в цвет ветки, впереди — приглушённая */}
-        <i className={`sd-line ${focus ? 'rest' : ''}`} style={{ left: x(0), width: x(n - 1) - x(0), background: focus ? undefined : color }} />
-        {focus && <i className="sd-line fill" style={{ left: x(0), width: Math.max(0, x(sel) - x(0)), background: color }} />}
+        {/* пройденная часть линии — в цвет ветки, впереди — приглушённая */}
+        <i className="sd-line rest" style={{ left: x(0), width: x(n - 1) - x(0) }} />
+        <i className="sd-line fill" style={{ left: x(0), width: Math.max(0, x(sel) - x(0)), background: color }} />
         {stops.map((s, i) => {
           const rail = railOf(s.name)
           return (
-            <span key={s.stop_id} className={`sd-stop ${i === sel ? 'on' : ''} ${focus && i > sel ? 'ahead' : ''} ${focus && i === sel + 1 ? 'next' : ''}`} style={{ transform: `translate3d(${x(i)}px,0,0)` }}
-              title={`${nice(s.name)} — ≈${fmt(values[i])} пос./ч`}>
-              {!focus && <i className="bar" style={{ height: Math.max(2, (values[i] / top) * 16), background: color, width: focus ? 10 : Math.max(3, Math.min(10, gap * 0.55)) }} />}
+            <span key={s.stop_id} className={`sd-stop ${i === sel ? 'on' : ''} ${i > sel ? 'ahead' : ''} ${i === sel + 1 ? 'next' : ''}`}
+              style={{ transform: `translate3d(${x(i)}px,0,0)` }} title={nice(s.name)}>
               <b className="dot" style={{ borderColor: color, ['--c' as string]: color }} />
-              {shown(i) && (
-                <span className="lb">{rail && <em className={rail.kind === 'М' ? 'm' : 'd'}>{rail.kind}</em>}{labelOf(s.name)}</span>
-              )}
+              {<span className="lb">{rail && <em className={rail.kind === 'М' ? 'm' : 'd'}>{rail.kind}</em>}{rail ? rail.name : nice(s.name)}</span>}
             </span>
           )
         })}
       </>}
-    </div>
-    {focus && <>
-      <button className="sd-arr r" disabled={sel >= n - 1} onClick={() => onPick(sel + 1)} title={sel < n - 1 ? nice(stops[sel + 1].name) : 'Конец линии'}><ChevronRight size={18} /></button>
-    </>}
     </div>
   )
 }
@@ -185,7 +142,7 @@ export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, st
   const idx = stops.findIndex((s) => s.stop_id === stopId)
   const stop = idx >= 0 ? stops[idx] : null
   const terminals = r.name.replace(/^Трамвай \d+: /, '').replace(/\s*=>\s*/, ' → ')
-  const perStop = stops.map((s) => r.boardings[hour] * s.weight)
+  const [termA, termB] = r.name.replace(/^Трамвай \d+: /, '').split(/\s*=>\s*/)
 
   // перелистывание: в режиме остановки — остановки ветки, в режиме ветки — сами ветки
   const routeIds = list.map((x) => x.route)
@@ -238,7 +195,7 @@ export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, st
         <button className="seg-solo" onClick={() => (stop ? onStop(null) : onClose())} title={stop ? 'Ко всей ветке (Esc)' : 'Закрыть (Esc)'}><ArrowLeft size={17} /></button>
         <div className="sd-pickwrap" ref={pickRef}>
           <button className={`sd-back sd-pick ${pick ? 'on' : ''}`} onClick={() => setPick(!pick)} title={`Трамвай №${r.route}: ${terminals} — выбрать другую ветку`}>
-            <span className="rnum lg" style={{ background: r.color }}>{r.route}</span><span className="t">{terminals}</span><ChevronDown size={15} className="caret" />
+            <span className="rnum lg" style={{ background: r.color }}>{r.route}</span><span className="t">Трамвай №{r.route}</span><ChevronDown size={15} className="caret" />
           </button>
           {pick && (
             <div className="sd-drop">
@@ -262,17 +219,12 @@ export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, st
         </a>
       </div>
 
-      {/* остановка: уровнем ниже — соседние станции, кнопки постоянной ширины */}
-      {stop && (
-        <div className="sd-steps">
-          <button disabled={!prevStop} onClick={() => go(-1)} title={prevStop ? `${prevStop.name} · ↑` : undefined}>
-            <ChevronLeft size={16} /><span>{prevStop ? nice(prevStop.name) : 'начало линии'}</span>
-          </button>
-          <button disabled={!nextStop} onClick={() => go(1)} title={nextStop ? `${nextStop.name} · ↓` : undefined}>
-            <span>{nextStop ? nice(nextStop.name) : 'конец линии'}</span><ChevronRight size={16} />
-          </button>
-        </div>
-      )}
+
+      {/* конечные — как маршрут на схеме: откуда ↓ куда, целиком, без многоточий */}
+      <div className="sd-route" style={{ ['--c' as string]: r.color }}>
+        <div className="rt a"><i /><span>{nice(termA)}</span></div>
+        {termB && <div className="rt b"><i /><span>{nice(termB)}</span></div>}
+      </div>
 
       {/* у остановки название — на самой ленте, под указателем; у ветки — сводка по линии */}
       {!stop && (
@@ -283,7 +235,7 @@ export default function RoutePanel({ route: r, geo, allGeo, list, date, hour, st
         </div>
       )}
 
-      <StopStrip key={r.route} stops={stops} color={r.color} values={perStop} sel={idx} onPick={(i) => onStop(stops[i].stop_id)} />
+      {stop && <StopStrip key={r.route} stops={stops} color={r.color} sel={idx} onPick={(i) => onStop(stops[i].stop_id)} />}
     </div>
   )
 
