@@ -707,6 +707,7 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
   color: var(--muted); cursor: pointer; font-size: 13px; white-space: nowrap; }
 .pb-tabs button:hover { color: var(--text); background: rgba(255,255,255,.06); }
 .pb-tabs button.on { color: var(--text); background: rgba(255,255,255,.1); font-weight: 600; }
+.pb-group { font-size: 15px; font-weight: 700; letter-spacing: -.1px; white-space: nowrap; }
 .pb-run { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent); white-space: nowrap; }
 .spin { animation: spin 1.2s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -739,7 +740,7 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
   .page-bar { padding: 10px 12px; gap: 8px; }
   .pb-tabs button span { display: none; }
   .pb-tabs button.on span { display: inline; }
-  .pb-run { display: none; }
+  .pb-run, .pb-group { display: none; }
   .page-body { padding: 16px 12px 40px; }
   .page .g2, .page .g4 { grid-template-columns: 1fr; }
 }
@@ -1659,19 +1660,7 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .ops-side h4.sec-title { font-size: 14px; font-weight: 700; color: var(--text); gap: 8px; }
 .ops-side h4.sec-title svg { color: var(--muted); }
 
-/* ================= разделы меню: «О проекте», «Сводка», «Настройки» ================= */
-.psec-nav { position: sticky; top: 58px; z-index: 4; align-self: start; display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
-  padding: 8px; margin: -8px -8px 0; border: 1px solid var(--hair); border-radius: 12px; background: #10192c; box-shadow: 0 8px 24px rgba(0,0,0,.3); }
-.psec-nav::-webkit-scrollbar { display: none; }
-.psec-nav button { flex: none; height: 34px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #aebbd0; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
-.psec-nav button:hover { color: var(--text); background: rgba(148,163,184,.14); }
-.psec-nav button.on { color: var(--accent); background: rgba(34,211,238,.13); font-weight: 700; }
-.psec { display: grid; gap: 14px; scroll-margin-top: 128px; }
-.psec + .psec { margin-top: 18px; padding-top: 22px; border-top: 1px solid var(--hair, rgba(148,163,184,.14)); }
-.psec.psec-joined { margin-top: 0; padding-top: 0; border-top: 0; }
-.psec-head h2 { margin: 0 0 4px; font-size: 19px; font-weight: 700; letter-spacing: -.2px; }
-.psec-head p { margin: 0; max-width: 820px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
-.psec-body { display: grid; gap: 16px; }
+/* ================= разделы меню: «Дашборд», «О проекте», «Настройки» ================= */
 .about-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .about-steps li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; align-items: start; font-size: 13.5px; line-height: 1.5; color: #cbd5e1; }
 .about-steps li svg { color: var(--accent); margin-top: 2px; }
@@ -1697,18 +1686,15 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .norm-tbl .nb { color: var(--muted); text-decoration: line-through; text-decoration-color: transparent; }
 .norm-tbl .nb::after { content: ' →'; color: var(--muted); }
 .set-foot { margin-top: 4px; max-width: 820px; line-height: 1.5; }
-@media (max-width: 720px) { .psec-nav, .set-bar { top: 52px; } }
+@media (max-width: 720px) { .set-bar { top: 52px; } }
 .coef .k { grid-template-columns: 1fr 60px; }
 
-/* «Сводка» и «Настройки» — панелью слева, как карточка ветки */
+/* «Настройки» — панелью слева, как карточка ветки */
 .ops.side-wide { --side: min(640px, 48vw); }
 .side-page .sd-id svg { color: var(--accent); flex: none; }
 .side-page .side-sub { margin-top: -4px; line-height: 1.45; }
 .side-page .grid { grid-template-columns: minmax(0, 1fr) !important; }
-.side-page .psec-nav, .side-page .set-bar { top: -14px; }
-.side-page .psec-nav { background: #10192c; }
-.side-page .psec + .psec { margin-top: 8px; }
-.side-page .psec-head h2 { font-size: 17px; }
+.side-page .set-bar { top: -14px; }
 .side-page .set-bar .set-state { flex-basis: 100%; }
 .side-page .card { min-width: 0; }
 .side-page .grid.g4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }

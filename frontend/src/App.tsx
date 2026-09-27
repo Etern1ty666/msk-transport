@@ -1,22 +1,34 @@
-import { ArrowLeft, BookOpenText, ChartNoAxesCombined, RefreshCw, Settings as Gear, Table2, TriangleAlert, X } from 'lucide-react'
+import { ArrowLeft, ChartNoAxesCombined, Database, MousePointerClick, RefreshCw, Server, Settings as Gear, Sigma, Table2, TriangleAlert, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, DEFAULT_COEF, OFFLINE, TH, useSocket, type Coef, type LogEvent, type Meta, type RouteGeo, type Schema, type Segment, type Settings, type Stage } from './api'
 import { AppCtx } from './components'
 import OpsScreen from './ops/OpsScreen'
-import AboutPage from './pages/AboutPage'
 import ForecastPage from './pages/ForecastPage'
+import ModelPage from './pages/ModelPage'
 import Overview from './pages/Overview'
+import PipelinePage from './pages/PipelinePage'
+import ServicePage from './pages/ServicePage'
 import SettingsPage from './pages/SettingsPage'
+import UsePage from './pages/UsePage'
 
-// меню — три раздела; прежние адреса (#overview, #model …) открывают раздел, куда вошла их страница
+// меню — два раздела со своими вкладками: «Дашборд» (прогноз и аналитика) и «О проекте» (как пользоваться, модель, данные, сервис);
+// у каждой вкладки свой адрес (#forecast, #model …), прежние адреса (#overview, #about) открывают первую вкладку своего раздела
 // side — открывается панелью слева поверх карты (как карточка ветки); иначе — страница на весь экран
-const PAGES: Record<string, { title: string; sub: string; icon: typeof Gear; el: () => React.ReactElement; side?: boolean; wide?: boolean }> = {
-  forecast: { title: 'Прогноз и выгрузка', sub: 'День, месяц, год · маршрут, остановка, интервал · CSV и XLSX', icon: Table2, el: ForecastPage },
-  summary: { title: 'Аналитика', sub: 'Пассажиропоток, пики и потребность в вагонах', icon: ChartNoAxesCombined, el: Overview },
-  about: { title: 'О проекте', sub: 'Как пользоваться, как считается прогноз, данные и сервис', icon: BookOpenText, el: AboutPage },
+const GROUPS: Record<string, string> = { dashboard: 'Дашборд', about: 'О проекте' }
+const PAGES: Record<string, { group?: string; title: string; sub: string; icon: typeof Gear; el: () => React.ReactElement; side?: boolean; wide?: boolean }> = {
+  forecast: { group: 'dashboard', title: 'Прогноз и выгрузка', sub: 'День, месяц, год · маршрут, остановка, интервал · CSV и XLSX', icon: Table2, el: ForecastPage },
+  summary: { group: 'dashboard', title: 'Аналитика', sub: 'Пассажиропоток, пики и потребность в вагонах', icon: ChartNoAxesCombined, el: Overview },
+  use: { group: 'about', title: 'Как пользоваться', icon: MousePointerClick, el: UsePage,
+    sub: 'ПОТОК (СПП, система прогнозирования пассажиропотока) прогнозирует посадки в трамваи Москвы по часам на 10 маршрутах и подсказывает диспетчеру, где не хватит вагонов и откуда их взять.' },
+  model: { group: 'about', title: 'Как считается прогноз', icon: Sigma, el: ModelPage,
+    sub: 'Профиль посадок «маршрут × час» по последним неделям, умноженный на поправки: календарь и праздники, погода, тренд маршрута и сезон. Ниже — формула, бэктест на октябре, вклад каждого источника и сравнение с ML-моделями.' },
+  pipeline: { group: 'about', title: 'Данные и обработка', icon: Database, el: PipelinePage,
+    sub: 'Сырые валидации (≈47 млн строк) агрегируются DuckDB по часам, к ним добавляются погода и календарь, затем строится модель, прогноз и файл для платформы. Конвейер можно перезапустить и следить за ним в реальном времени.' },
+  service: { group: 'about', title: 'Сервис и API', icon: Server, el: ServicePage,
+    sub: 'FastAPI отдаёт прогноз за миллисекунды — с корректировками из «Настроек». Здесь метрики в реальном времени, нагрузочный тест и все точки входа API со ссылкой на Swagger.' },
   settings: { title: 'Настройки', sub: 'Коэффициенты прогноза, норматив и пороги рекомендаций — сохраняются на сервере и действуют для всех', icon: Gear, el: SettingsPage, side: true },
 }
-const ALIAS: Record<string, string> = { overview: 'summary', model: 'about', pipeline: 'about', service: 'about', use: 'about' }
+const ALIAS: Record<string, string> = { dashboard: 'forecast', overview: 'summary', about: 'use' }
 const pageOf = (k: string) => ALIAS[k] ?? (k in PAGES ? k : null)
 
 export default function App() {
@@ -119,8 +131,9 @@ export default function App() {
         <div className="page">
           <header className="page-bar">
             <button className="pb-back" onClick={() => openDrawer(null)} title="К карте (Esc)"><ArrowLeft size={16} /> Карта</button>
+            {d.group && <span className="pb-group">{GROUPS[d.group]}</span>}
             <nav className="pb-tabs">
-              {Object.entries(PAGES).filter(([k]) => k !== 'settings').map(([k, v]) => (
+              {Object.entries(PAGES).filter(([, v]) => v.group === d.group).map(([k, v]) => (
                 <button key={k} className={k === drawer ? 'on' : ''} onClick={() => openDrawer(k)}><v.icon size={15} strokeWidth={1.75} /><span>{v.title}</span></button>
               ))}
             </nav>
