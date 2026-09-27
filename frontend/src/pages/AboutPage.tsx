@@ -28,6 +28,7 @@ export default function AboutPage() {
               <li><ArrowLeftRight size={18} /><span>Кнопка с картой справа — переключить подложку: схема маршрутов или городская карта.</span></li>
             </ol>
           </Card>
+        </div>
       </Section>
 
       <Section id="ab-model" title="Как считается прогноз"
