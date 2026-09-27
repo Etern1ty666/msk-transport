@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from app.ml import calendar as C
+from app.ml import route_events as E
 
 ROUTES = [1, 5, 7, 11, 12, 17, 25, 26, 28, 50]
 HOURS = list(range(24))
@@ -56,6 +57,7 @@ class ModelParams:
     dow_classes: bool = False       # 7 классов (каждый день недели) вместо 5
     trend_skip_school: bool = True  # не считать тренд по неделе школьных каникул (провал спроса)
     profile_skip_school: bool = False
+    exclude_disruptions: bool = True
 
 
 def full_grid(labels: pd.DataFrame, start: str, end: str) -> pd.DataFrame:
@@ -82,6 +84,8 @@ class ProfileModel:
         hist = hist[hist.date <= origin]
         cal = C.calendar_frame(pd.DatetimeIndex(hist.date.unique()))
         hist = hist.merge(cal[["date", "day_class", "is_holiday", "is_pre_holiday", "holiday_first", "school_holiday"]], on="date")
+        if p.exclude_disruptions:
+            hist = hist.loc[~E.disrupted_mask(hist)].copy()
         normal = (hist.is_holiday == 0) & (hist.is_pre_holiday == 0)
         in_school = hist.school_holiday.eq(1) & (hist.date.dt.month.isin([1, 3, 4, 10, 11, 12]))  # короткие каникулы, не лето
 
@@ -127,7 +131,8 @@ class ProfileModel:
         d["base"] = d.groupby(["route", "day_class"]).y.transform(lambda s: s.shift(1).rolling(5, min_periods=3).median())
         d = d.dropna().merge(weather_daily, on="date")
         d = d[d.base > 0]
-        d["lr"] = np.log(d.y / d.base)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            d["lr"] = np.log(d.y / d.base)
         d = d[d.lr.abs() < 0.5]
         per_day = d.groupby("date").agg(lr=("lr", "mean"), precip=("precip", "first"))
         per_day["bin"] = pd.cut(per_day.precip, PRECIP_BINS, labels=False)
