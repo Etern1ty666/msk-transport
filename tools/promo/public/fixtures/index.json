@@ -1,0 +1,18 @@
+{
+ "/api/day?date=2026-09-27&weather=1&event=1&season=1&trend=1&holiday=1&v=0&n=1": "c5ff3a4e80f6f5b6.json",
+ "/api/day?date=2026-10-01&weather=1&event=1&season=1&trend=1&holiday=1&v=0&n=1": "4d1089e31c3d343b.json",
+ "/api/day?date=2026-09-30&weather=1&event=1&season=1&trend=1&holiday=1&v=0&n=1": "be31b7454711b7c5.json",
+ "/api/day?date=2026-09-29&weather=1&event=1&season=1&trend=1&holiday=1&v=0&n=1": "1ebf456719a8e771.json",
+ "/api/day?date=2026-09-28&weather=1&event=1&season=1&trend=1&holiday=1&v=0&n=1": "320f3b30828f1f35.json",
+ "/api/settings": "e8f9f693bfd4e746.json",
+ "/api/meta": "be7b90a11cde1462.json",
+ "/api/geo": "6766d4412f98252b.json",
+ "/api/forecast?horizon=day&date=2025-11-12&hour_from=0&hour_to=23&weather=1&event=1&season=1&trend=1&holiday=1&by_route=true&v=0": "5586e2f4704b4592.json",
+ "/api/forecast?date_from=2025-11-01&date_to=2025-12-31&agg=day&by_route=true&weather=1&event=1&season=1&trend=1&holiday=1&v=0": "09b4c93d25d93cb3.json",
+ "/api/recommendations?date=2025-11-12&weather=1&event=1&season=1&trend=1&holiday=1&v=0": "94802ae32f22ea6e.json",
+ "/api/forecast?date_from=2025-11-01&date_to=2025-12-31&agg=hour_of_day&weather=1&event=1&season=1&trend=1&holiday=1&v=0": "467fc0d6953e41b6.json",
+ "/api/history?date_from=2025-09-01&agg=day&v=0": "4ba32ea116eb130e.json",
+ "/api/decompose?route=17&date=2025-11-12&weather=1&event=1&season=1&trend=1&holiday=1&v=0": "d36266e8205ec741.json",
+ "/api/backtest/hourly?v=0": "3caabdbf0e390933.json",
+ "/api/model?v=0": "c841878d9fdbc2ca.json"
+}
