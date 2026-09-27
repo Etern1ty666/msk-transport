@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Clock, Info, Route, ShieldCheck, TriangleAlert, Warehouse } from 'lucide-react'
-import { LEVEL_COLORS, levelOf, vehicleVariants, DONOR_MAX, SOFT, type DayRoute, type Depot } from '../api'
-import { hspan } from './Glyphs'
+import { Clock, Info, Route, ShieldCheck, TriangleAlert, Warehouse } from 'lucide-react'
+import { vehicleVariants, freeVariants, DONOR_MAX, FREE, FREE_TARGET, SOFT, type DayRoute, type Depot } from '../api'
 
 type Win = { from: number; to: number; extra: number }
 
@@ -21,9 +20,17 @@ export function TramSide({ size = 22, className }: { size?: number; className?: 
   )
 }
 const hh = (h: number) => `${String(h).padStart(2, '0')}:00`
-const span = (w: Win) => `${hh(w.from)}–${String(w.to + 1).padStart(2, '0')}:00`
+const span = (w: { from: number; to: number }) => `${hh(w.from)}–${String(w.to + 1).padStart(2, '0')}:00`
 const pct = (r: number) => `${Math.round(r * 100)}%`
 const vag = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 'вагон' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'вагона' : 'вагонов')
+
+/** Подпись варианта — сами источники (или получатели): парк по названию, ветка — её номером в цвете. */
+function Places({ items, short }: { items: ({ kind: 'depot'; name: string } | { kind: 'route'; route: number; color: string })[]; short: (n: string) => string }) {
+  return <>{items.map((it, i) => it.kind === 'depot'
+    ? <span key={`d${i}`} className="fp-tchip depot" title={short(it.name)}><Warehouse size={12} /><span className="nm">{short(it.name)}</span></span>
+    : <span key={`r${it.route}`} className="fp-tchip rnum" style={{ background: it.color }}>{it.route}</span>)}</>
+}
+const hours = (w: { from: number; to: number }) => `${w.to - w.from + 1} ч`
 
 /** Схема переброски вагонов: за час до перегрузки (и пока она идёт) — несколько вариантов, откуда взять вагоны.
  *  Каждая строка: источник (ветка-донор или парк) → эта ветка, сколько вагонов; вагончик бежит по стрелке.
@@ -49,25 +56,20 @@ export default function Fleet({ r, list, depots, win, hour, soft = false }: {
 
   return (
     <div className={`fplan ${soon ? 'soon' : 'now'} ${soft ? 'soft' : ''}`}>
-      <div className="fp-head" title={soft
-        ? `${soon ? 'Через час' : 'Сейчас'} загрузка выше ${pct(SOFT)} (${span(win)}): можно подогнать +${need} ${vag(need)} из свободных — было ${was}, станет ${was + need}. Перегруженным веткам вагоны оставлены.`
-        : `${soon ? 'Через час' : 'Сейчас'} перегрузка ${span(win)}: нужно +${need} ${vag(need)} — было ${was}, станет ${was + need}`}>
-        <span className="fp-when">{soon ? <Clock size={13} /> : <TriangleAlert size={13} />}{soon ? 'через 1 ч' : 'сейчас'}{soft && <em>&gt;{pct(SOFT)}</em>}</span>
-        <span className="fp-span">{hspan(win)}</span>
-        <span className="fp-need"><TramSide size={14} />{was}<ArrowRight size={12} /><b>{was + need}</b></span>
-        <span className="fs-info" title={note}><Info size={14} /></span>
+      <div className="fp-head" title={`${soft
+        ? `${soon ? `Через ${win.from - hour} ч` : 'Сейчас'} загрузка выше ${pct(SOFT)} (${span(win)}): можно подогнать +${need} ${vag(need)} из свободных — было ${was}, станет ${was + need}. Перегруженным веткам вагоны оставлены.`
+        : `${soon ? `Через ${win.from - hour} ч` : 'Сейчас'} перегрузка ${span(win)}: нужно +${need} ${vag(need)} — было ${was}, станет ${was + need}`}\n\n${note}`}>
+        <span className="fp-say need">{soon ? `Через ${win.from - hour} ч нужны вагоны` : 'Нужны вагоны'}: <b>+{need}</b></span>
       </div>
 
+      <div className={`fp-tabbox ${plans.length > 1 ? 'tabbed' : ''}`} data-pos={pick === 0 ? 'first' : pick === plans.length - 1 ? 'last' : 'mid'}>
       {plans.length > 1 && (
-        <div className="fp-tabs" role="tablist">
+        <div className="fp-tabs" role="tablist" style={{ ['--n' as string]: plans.length }}>
           {plans.map((p, i) => (
             <button key={p.key} role="tab" aria-selected={i === pick} className={i === pick ? 'on' : ''} onClick={() => setPick(i)}
               title={`Вариант ${i + 1}: ${p.title.toLowerCase()} — ${p.sources.map((s) => (s.kind === 'depot' ? short(s.name) : `№${s.route}`) + ` +${s.take}`).join(', ')}`}>
-              <i>{i + 1}</i>
-              {p.key.startsWith('one-') ? p.sources.map((s) => s.kind === 'depot'
-                ? <span key="d" className="fp-tchip depot"><Warehouse size={11} />{short(s.name)}</span>
-                : <span key="r" className="fp-tchip rnum" style={{ background: s.color }}>{s.route}</span>)
-                : <span className="fp-tt">{p.title}</span>}
+              <span className="fp-tplaces"><Places items={p.sources} short={short} /></span>
+              <span className="fp-tn"><TramSide size={12} />×{p.sources.reduce((a, x) => a + x.take, 0)}</span>
             </button>
           ))}
         </div>
@@ -80,25 +82,24 @@ export default function Fleet({ r, list, depots, win, hour, soft = false }: {
               title={s.kind === 'depot'
                 ? `Из парка «${short(s.name)}»${s.own ? ' (своя площадка)' : ' (другая площадка, перегон дольше)'}: готовы ${s.avail}, берём ${s.take} → №${r.route}`
                 : `С ветки №${s.route}${s.own ? ' (та же площадка)' : ' (другая площадка, перегон дольше)'}: ${s.take} ${vag(s.take)} → №${r.route}; у №${s.route} загрузка станет ${pct(s.before)} → ${pct(s.after)}`}>
-              {s.kind === 'depot'
-                ? <span className="fp-src depot"><Warehouse size={14} />{short(s.name)}</span>
-                : <span className="fp-src rnum lg" style={{ background: s.color }}>{s.route}</span>}
+              <span className="fp-from">
+                {s.kind === 'depot'
+                  ? <span className="fp-src depot"><Warehouse size={14} />{short(s.name)}</span>
+                  : <span className="fp-src rnum lg" style={{ background: s.color }}>{s.route}</span>}
+                <span className="fp-have"><TramSide size={12} />×{s.kind === 'depot' ? s.avail : Math.floor(list.find((x) => x.route === s.route)?.vehicles[win.from] ?? 0)}</span>
+              </span>
               <span className="fp-track">
+                <span className="fp-dur" title={`На ${span(win)}`}><Clock size={11} />{hours(win)}</span>
                 <span className="fp-line" />
                 <span className="fp-car"><TramSide size={11} /></span>
-                <span className="fp-sub">
-                  {s.kind === 'depot'
-                    ? <>в парке {s.avail}</>
-                    : <>{pct(s.before)}<ArrowRight size={10} /><em style={{ color: LEVEL_COLORS[levelOf(s.after)] }}>{pct(s.after)}</em></>}
-                  {!s.own && <Route size={11} className="far-ico" />}
-                </span>
+                <span className="fp-sub"><TramSide size={13} />×{s.take}{!s.own && <Route size={11} className="far-ico" />}</span>
               </span>
               <span className="fp-dst rnum lg" style={{ background: r.color }}>{r.route}</span>
-              <b className="fp-take"><TramSide size={14} />+{s.take}</b>
             </div>
           ))}
         </div>
       )}
+      </div>
 
       {left > 0 && (soft
         ? <div className="fs-left soft" title={`Ещё ${left} ${vag(left)} свободных нет: остальной запас нужен перегруженным веткам. Ветка в нормативе — можно не добавлять.`}>
@@ -113,6 +114,84 @@ export default function Fleet({ r, list, depots, win, hour, soft = false }: {
           {reserved.map((x) => <span key={x.route} className="fp-resi"><span className="rnum" style={{ background: x.color }}>{x.route}</span>+{x.take}</span>)}
         </div>
       )}
+    </div>
+  )
+}
+
+/** Схема «можно освободить линию»: загрузка ниже 50% — сколько вагонов снять и куда их деть.
+ *  Строка: эта ветка → ветка, которой вагонов не хватает (или парк), сколько вагонов; как у добавления, вагончик бежит по стрелке. */
+export function FreeFleet({ r, list, depots, win, hour }: {
+  r: DayRoute; list: DayRoute[]; depots: Record<string, Depot> | null | undefined
+  win: { from: number; to: number; spare: number } | null; hour: number
+}) {
+  const [pick, setPick] = useState(0)
+  useEffect(() => { setPick(0) }, [r.route, win?.from])
+  const plans = useMemo(() => (win ? freeVariants(r, list, depots, win.from, win.to, win.spare) : []), [r, list, depots, win])
+  if (!win || !plans.length) return null
+  const plan = plans[Math.min(pick, plans.length - 1)]
+  const soon = hour < win.from
+  const was = Math.floor(r.vehicles[win.from])
+  const short = (name: string) => name.replace(/^площадка\s+/i, '')
+  const note = `Загрузка ниже ${pct(FREE)} норматива: можно снять ${win.spare} ${vag(win.spare)} — после этого загрузка не выше ${pct(FREE_TARGET)}, `
+    + `а на линии остаётся не меньше половины вагонов. Сначала вагоны получают ветки, которым их не хватает (перегруженные, затем выше ${pct(SOFT)}), остальные уходят в парк.`
+
+  return (
+    <div className={`fplan free ${soon ? 'soon' : 'now'}`}>
+      <div className="fp-head" title={`${soon ? 'Через час' : 'Сейчас'} ${span(win)} загрузка ниже ${pct(FREE)}: можно снять ${win.spare} ${vag(win.spare)} — было ${was}, останется ${was - win.spare}\n\n${note}`}>
+        <span className="fp-say ok">Вагоны не нужны{soon ? ` через ${win.from - hour} ч` : ''} — можно снять <b>{win.spare}</b></span>
+      </div>
+
+      <div className={`fp-tabbox ${plans.length > 1 ? 'tabbed' : ''}`} data-pos={pick === 0 ? 'first' : pick === plans.length - 1 ? 'last' : 'mid'}>
+      {plans.length > 1 && (
+        <div className="fp-tabs" role="tablist" style={{ ['--n' as string]: plans.length }}>
+          {plans.map((p, i) => (
+            <button key={p.key} role="tab" aria-selected={i === pick} className={i === pick ? 'on' : ''} onClick={() => setPick(i)}
+              title={`Вариант ${i + 1}: ${p.dests.map((d) => (d.kind === 'depot' ? `в парк ${d.give}` : `№${d.route} +${d.give}`)).join(', ')}`}>
+              <span className="fp-tplaces"><Places items={p.dests} short={short} /></span>
+              <span className="fp-tn"><TramSide size={12} />×{p.dests.reduce((a, x) => a + x.give, 0)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="fp-rows" key={plan.key}>
+        {plan.dests.map((d, i) => (
+          <div key={d.kind === 'depot' ? 'park' : `r${d.route}`} className={`fp-row ${d.kind === 'route' && !d.own ? 'far' : ''}`} style={{ ['--i' as string]: i }}
+            title={d.kind === 'depot'
+              ? `${d.give} ${vag(d.give)} с №${r.route} — в парк «${short(d.name)}»`
+              : `${d.give} ${vag(d.give)} с №${r.route} на №${d.route}${d.own ? ' (та же площадка)' : ' (другая площадка, перегон дольше)'}: у №${d.route} загрузка станет ${pct(d.before)} → ${pct(d.after)}`}>
+            <span className="fp-from">
+              <span className="fp-src rnum lg" style={{ background: r.color }}>{r.route}</span>
+              <span className="fp-have"><TramSide size={12} />×{was}</span>
+            </span>
+            <span className="fp-track">
+              <span className="fp-dur" title={`На ${span(win)}`}><Clock size={11} />{hours(win)}</span>
+              <span className="fp-line" />
+              <span className="fp-car"><TramSide size={11} /></span>
+              <span className="fp-sub"><TramSide size={13} />×{d.give}{d.kind === 'route' && !d.own && <Route size={11} className="far-ico" />}</span>
+            </span>
+            {d.kind === 'depot'
+              ? <span className="fp-dst fp-src depot"><Warehouse size={14} />{short(d.name)}</span>
+              : <span className="fp-dst rnum lg" style={{ background: d.color }}>{d.route}</span>}
+          </div>
+        ))}
+      </div>
+      </div>
+    </div>
+  )
+}
+
+/** Когда перебрасывать нечего: ни перегрузки / >80% впереди, ни лишних вагонов — спокойная карточка на месте схемы. */
+export function FleetCalm({ r, hour }: { r: DayRoute; hour: number }) {
+  const v = Math.floor(r.vehicles[hour])
+  const run = r.vehicles.some((x, h) => h > hour && x > 0)
+  return (
+    <div className="fplan calm" title={v > 0
+      ? `Загрузка ${pct(r.ratio[hour])}: вагонов в самый раз — не нужно ни добавлять (до конца суток не выше ${pct(SOFT)}), ни снимать (не ниже ${pct(FREE)})`
+      : 'В этот час ветка не работает'}>
+      <div className="fp-head">
+        <span className="fp-say ok">{v > 0 ? 'Вагоны не нужны' : run ? 'Вагоны не нужны — нет выпуска' : 'Вагоны не нужны — выпуск окончен'}</span>
+      </div>
     </div>
   )
 }

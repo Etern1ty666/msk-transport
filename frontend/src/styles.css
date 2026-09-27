@@ -1307,12 +1307,18 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 @keyframes curIn { from { opacity: 0; transform: translateY(5px); } }
 /* выбранная станция подписана и сверху (по диагонали, не пропадает), и снизу — к нижнему названию ведёт стрелка */
 .sd-stop.on .lb { opacity: 1; color: #fff; font-weight: 700; }
-.sd-strip.focus { height: 160px; }
-.sd-down { position: absolute; z-index: 4; left: 50%; top: calc(var(--ly) + 9px); transform: translateX(-50%); color: #cbd5e1; line-height: 0; pointer-events: none;
-  animation: downNudge 1.6s ease-in-out infinite; }
-@keyframes downNudge { 50% { transform: translate(-50%, 2px); } }
-.sd-strip.focus .sd-cur { top: calc(var(--ly) + 25px); }
-@media (prefers-reduced-motion: reduce) { .sd-down { animation: none; } }
+.sd-strip.focus { height: 148px; }
+.sd-strip.focus .sd-cur { top: calc(var(--ly) + 14px); }
+/* лента без подложки и рамки: края затухают маской там, где за ними ещё есть станции */
+.sd-strip.focus { --fl: 0px; --fr: 0px; background: none; border: 0; box-shadow: none; border-radius: 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent); }
+.sd-strip.focus.more-l { --fl: 56px; }
+.sd-strip.focus.more-r { --fr: 56px; }
+.sd-strip.focus::before, .sd-strip.focus::after { display: none; }
+/* разделитель под закреплённой шапкой карточки — только когда содержимое прокручено под неё */
+.sd-top { border-bottom-color: transparent; transition: border-color .2s; }
+.sd.scrolled .sd-top { border-bottom-color: var(--hair, rgba(148,163,184,.14)); }
 
 /* ---------- вагоны ветки: сколько на линии и откуда взять недостающие ---------- */
 /* шапка карточки: номер ветки и вагоны на линии «🚋 ×13» */
@@ -1437,9 +1443,20 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .fstrip { align-items: center; }
 .fcount { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 4px; color: var(--text); }
 
-.sd-close { flex: none; margin-left: auto; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0;
+.sd-close { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0;
   background: none; color: var(--muted); cursor: pointer; border-radius: 8px; transition: color .15s; }
-.sd-close:hover { color: var(--text); }
+.sd-close:hover, .sd-close.on { color: var(--text); background: rgba(148,163,184,.12); }
+/* меню «⋮» в шапке карточки */
+.sd-more { position: relative; flex: none; margin-left: auto; }
+.sd-more-back { position: fixed; inset: 0; z-index: 30; }
+.sd-menu { position: absolute; z-index: 31; top: calc(100% + 6px); right: 0; min-width: 240px; padding: 6px; border-radius: 12px;
+  background: #16223b; border: 1px solid rgba(148,163,184,.18); box-shadow: 0 12px 32px rgba(0,0,0,.45); animation: menuIn .14s ease-out; transform-origin: top right; }
+.sd-menu a { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 8px; color: var(--text); text-decoration: none; }
+.sd-menu a:hover { background: rgba(148,163,184,.12); text-decoration: none; }
+.sd-menu a > svg { flex: none; color: #4ade80; }
+.sd-menu a span { display: grid; gap: 2px; min-width: 0; }
+.sd-menu b { font-size: 13.5px; font-weight: 600; }
+.sd-menu em { font-style: normal; font-size: 12px; line-height: 1.35; color: var(--muted); }
 .sd-name .t { display: inline-block; }
 
 /* плитки карточки ветки — кнопки: по нажатию под ними на всю ширину раскрываются подробности */
@@ -1474,3 +1491,108 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .facts-box .tdet { margin-top: 8px; background: var(--tab); box-shadow: none; border-radius: 12px; padding: 12px 14px 14px; animation: fadein .15s ease-out; }
 .facts-box[data-tab="0"] .tdet { border-top-left-radius: 0; }
 .facts-box[data-tab="2"] .tdet { border-top-right-radius: 0; }
+
+/* схема «можно освободить линию»: зелёная, стрелки от этой ветки к нуждающимся или в парк */
+.fplan.free { box-shadow: inset 0 0 0 1px rgba(74,222,128,.32); }
+.fplan.free .fp-when { background: rgba(74,222,128,.14); color: #86efac; }
+.fplan.free .fp-line { background-image: repeating-linear-gradient(90deg, rgba(74,222,128,.75) 0 6px, transparent 6px 11px); }
+.fplan.free .fp-line::after { border-left-color: rgba(74,222,128,.9); }
+.fplan.free .fp-row.far .fp-line { background-image: repeating-linear-gradient(90deg, rgba(253,186,116,.75) 0 6px, transparent 6px 11px); }
+.fplan.free .fp-row.far .fp-line::after { border-left-color: rgba(253,186,116,.9); }
+.fplan.free .fp-take { color: #86efac; }
+.fplan.free .fp-tabs button.on { background: rgba(74,222,128,.14); box-shadow: inset 0 0 0 1px rgba(74,222,128,.35); }
+.fplan.free .fp-tabs button.on i { background: #4ade80; }
+.fcar.spare { opacity: .45; }
+.fcar.spare .shell { stroke: #4ade80; stroke-dasharray: 3 2; }
+
+/* строка схемы: слева источник и сколько там вагонов, под стрелкой — сколько перегоняем */
+.fp-row { grid-template-columns: minmax(0, auto) minmax(40px, 1fr) auto; align-items: start; }
+.fp-from { display: grid; justify-items: center; gap: 3px; min-width: 0; }
+.fp-have { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fp-sub { bottom: -4px; gap: 4px; font-size: 13px; font-weight: 700; color: var(--accent); }
+.fplan.free .fp-sub { color: #86efac; }
+.fp-row.far .fp-sub { color: #fdba74; }
+.fp-track { height: 36px; }
+
+/* вкладки вариантов: подписаны источниками, подложка — только у выбранной */
+.fp-tabs { background: none; padding: 0; gap: 6px; flex-wrap: wrap; }
+.fp-tabs button { flex: 0 1 auto; background: none; box-shadow: none; height: 30px; padding: 0 9px; gap: 5px; }
+.fp-tabs button:hover { background: rgba(148,163,184,.08); }
+.fp-tabs button.on { background: rgba(34,211,238,.14); box-shadow: inset 0 0 0 1px rgba(34,211,238,.4); }
+.fplan.free .fp-tabs button.on { background: rgba(74,222,128,.14); box-shadow: inset 0 0 0 1px rgba(74,222,128,.4); }
+.fp-tchip { height: 20px; min-width: 24px; font-size: 11.5px; }
+.fp-tchip.depot { background: none; padding: 0 2px; font-size: 12.5px; font-weight: 600; color: var(--text); }
+/* трек стрелки: сверху длительность, по центру линия с вагончиком, снизу ×N */
+.fp-track { height: 48px; }
+.fp-dur { position: absolute; left: 0; right: 6px; top: 0; display: flex; align-items: center; justify-content: center; gap: 3px;
+  font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fp-line { top: 23px; }
+.fp-car { top: 15px; }
+.fp-sub { bottom: 0; }
+.fp-from, .fp-dst { margin-top: 12px; }
+
+/* блок переброски, когда перебрасывать нечего */
+.fplan.calm { box-shadow: inset 0 0 0 1px rgba(148,163,184,.18); padding: 9px 12px; }
+.fplan.calm .fp-when { background: rgba(148,163,184,.12); color: #cbd5e1; }
+.fplan.calm .fp-when svg { color: #86efac; }
+
+/* загрузка и вагончики — в раскрытой плитке «вагоны» (раньше были в отдельной карточке) */
+.td-lead { display: grid; gap: 6px; margin-bottom: 8px; }
+.td-lead .big { display: flex; align-items: center; gap: 10px; }
+.td-lead .big > b { font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+.td-lead .big .stat b { color: var(--muted); font-weight: 500; font-size: 14px; letter-spacing: 0; }
+.fleetbox { display: grid; gap: 8px; }
+.fleetbox > .fplan { margin-top: 0; }
+
+/* карточка переброски без подложки; вместо чипов — одна фраза: нужны вагоны или нет */
+.fleetbox > .fplan, .fleetbox > .fplan.now, .fleetbox > .fplan.soft, .fleetbox > .fplan.free, .fleetbox > .fplan.calm { background: none; box-shadow: none; padding: 0; }
+.fp-say { font-size: 14px; font-weight: 600; white-space: normal; }
+.fp-say.need { color: #fdba74; }
+.fplan.now:not(.soft) .fp-say.need { color: #fca5a5; }
+.fp-say.ok { color: #86efac; }
+.fp-say b { font-variant-numeric: tabular-nums; font-size: 15px; }
+
+/* вкладки вариантов — как плитки сверху: выбранная перетекает в блок со схемой, остальные без подложки */
+.fp-tabbox { --tab: #1a2a3e; display: grid; }
+.fp-tabbox .fp-tabs { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; flex-wrap: nowrap; }
+.fp-tabbox .fp-tabs button, .fplan.free .fp-tabbox .fp-tabs button { position: relative; flex: none; height: auto; min-height: 40px; padding: 9px 10px; border-radius: 10px;
+  justify-content: flex-start; background: none; box-shadow: none; color: var(--muted); }
+.fp-tabbox .fp-tabs button:hover { background: rgba(148,163,184,.08); }
+.fp-tabbox .fp-tabs button.on, .fplan.free .fp-tabbox .fp-tabs button.on { background: var(--tab); box-shadow: none; color: var(--text); border-radius: 10px 10px 0 0; }
+.fp-tabbox .fp-tabs button.on::before, .fp-tabbox .fp-tabs button.on::after { content: ''; position: absolute; bottom: 0; width: 8px; height: 8px; pointer-events: none; }
+.fp-tabbox .fp-tabs button.on::before { left: -8px; background: radial-gradient(circle at 0 0, transparent 7.5px, var(--tab) 8px); }
+.fp-tabbox .fp-tabs button.on::after { right: -8px; background: radial-gradient(circle at 100% 0, transparent 7.5px, var(--tab) 8px); }
+.fp-tabbox .fp-tabs button.on:first-child::before, .fp-tabbox .fp-tabs button.on:last-child::after { display: none; }
+.fp-tabbox.tabbed .fp-rows { background: var(--tab); border-radius: 12px; padding: 10px 12px 12px; }
+.fp-tabbox.tabbed[data-pos="first"] .fp-rows { border-top-left-radius: 0; }
+.fp-tabbox.tabbed[data-pos="last"] .fp-rows { border-top-right-radius: 0; }
+.fp-tabbox .fp-car { background: var(--tab); }
+.fp-tabbox:not(.tabbed) .fp-car { background: #0d1424; }
+/* вкладки вариантов: цвет подложки — как у плиток сверху; внутри, как у плиток, две строки: откуда (куда) и сколько вагонов */
+.fp-tabbox { --tab: var(--surface, rgba(148,163,184,.08)); }
+.fp-tabbox .fp-tabs button, .fplan.free .fp-tabbox .fp-tabs button { display: grid; justify-items: start; align-content: start; gap: 5px; min-height: 0; padding: 9px 11px; }
+.fp-tplaces { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; overflow: hidden; }
+.fp-tplaces .fp-tchip { height: 22px; min-width: 28px; font-size: 12.5px; border-radius: 6px; }
+.fp-tplaces .fp-tchip.depot { height: 22px; padding: 0; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-tn { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fp-tabbox .fp-tabs button.on .fp-tn { color: var(--accent); }
+.fplan.free .fp-tabbox .fp-tabs button.on .fp-tn { color: #86efac; }
+.fp-tabbox .fp-car { background: #1a2333; }
+.fp-tabbox:not(.tabbed) .fp-car { background: #0d1424; }
+.fp-tchip.depot svg { flex: none; }
+.fp-tplaces .fp-tchip.depot { display: inline-flex; align-items: center; gap: 4px; }
+.fp-tchip.depot .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* отступ между фразой «нужны вагоны» и вкладками вариантов */
+.fp-tabbox.tabbed { margin-top: 6px; }
+/* вкладки вариантов: уголки-скругления у выбранной не обрезаются; невыбранные без подложки и при наведении */
+.fp-tabbox .fp-tabs button { overflow: visible; }
+.fp-tabbox .fp-tabs button:not(.on):hover { background: none; color: var(--text); }
+.fp-tabbox .fp-tabs button:not(.on):hover .fp-tn { color: var(--text); }
+
+/* выбранная плитка и её развёрнутая карточка — серые (и сверху, и у вариантов переброски) */
+.facts-box, .fp-tabbox { --tab: var(--surface, rgba(148,163,184,.08)); } /* как у остальных плиток темы */
+/* невыбранный вариант при наведении — только обводка */
+/* невыбранный вариант при наведении — как обычная плитка сверху; снизу у него отступ до карточки (к ней примыкает только выбранный) */
+.fp-tabbox .fp-tabs { align-items: stretch; }
+.fp-tabbox .fp-tabs button:not(.on) { margin-bottom: 8px; }
+.fp-tabbox .fp-tabs button:not(.on):hover { background: var(--surface, rgba(148,163,184,.08)); box-shadow: none; }

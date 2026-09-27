@@ -267,3 +267,57 @@ export function vehicleVariants(r: DayRoute, list: DayRoute[], depots: Record<st
   const full = uniq.filter((p) => p.left === 0)
   return { plans: (full.length ? full : uniq.slice(0, 1)).slice(0, 3), reserved }
 }
+
+/** Ниже этой загрузки ветку можно разгрузить: снять лишние вагоны. */
+export const FREE = 0.5
+/** После снятия загрузка не выше этой доли норматива, а на линии остаётся не меньше половины вагонов (интервал не рвётся). */
+export const FREE_TARGET = 0.7
+/** Сколько вагонов можно снять в час h. */
+export const spareAt = (r: DayRoute, h: number) => {
+  const v = Math.floor(r.vehicles[h])
+  if (v <= 0 || r.ratio[h] >= FREE) return 0
+  return Math.max(0, Math.min(v - Math.ceil(r.boardings[h] / (FREE_TARGET * r.norm)), Math.floor(v / 2)))
+}
+/** Окно «можно снять»: сейчас или со следующего часа, пока загрузка низкая; снимаем столько, сколько можно во все часы окна. */
+export function freeWindow(r: DayRoute, hour: number): { from: number; to: number; spare: number } | null {
+  const from = spareAt(r, hour) > 0 ? hour : hour < 23 && spareAt(r, hour + 1) > 0 ? hour + 1 : -1
+  if (from < 0) return null
+  let to = from
+  while (to < 23 && spareAt(r, to + 1) > 0) to++
+  let spare = Infinity
+  for (let h = from; h <= to; h++) spare = Math.min(spare, spareAt(r, h))
+  return { from, to, spare }
+}
+
+export type FreeDest =
+  | { kind: 'route'; route: number; color: string; own: boolean; give: number; before: number; after: number }
+  | { kind: 'depot'; place: string | null; name: string; give: number }
+export type FreePlan = { key: string; title: string; dests: FreeDest[] }
+
+/** Куда деть снятые с `r` вагоны в часы from..to: сначала веткам, которым их не хватает (перегруженным, затем выше 80%),
+ *  своей площадке — в первую очередь; остальное — в парк. Второй вариант — всё в парк. */
+export function freeVariants(r: DayRoute, list: DayRoute[], depots: Record<string, Depot> | null | undefined,
+  from: number, to: number, spare: number): FreePlan[] {
+  const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i)
+  const park: FreeDest = { kind: 'depot', place: r.place, name: (r.place && depots?.[r.place]?.name) || 'парк', give: spare }
+  const needs = list.filter((x) => x.route !== r.route && x.place).map((x) => {
+    const run = hours.filter((h) => x.vehicles[h] > 0)
+    const need = Math.max(0, ...run.map((h) => (x.ratio[h] >= 1 ? x.extra[h] : x.ratio[h] >= SOFT ? softExtra(x, h) : 0)))
+    return { x, run, need, max: Math.max(0, ...run.map((h) => x.ratio[h])) }
+  }).filter((n) => n.need > 0)
+    .sort((a, b) => +(b.max >= 1) - +(a.max >= 1) || +(b.x.place === r.place) - +(a.x.place === r.place) || b.max - a.max)
+  const dests: FreeDest[] = []
+  let left = spare
+  for (const n of needs) {
+    if (left <= 0) break
+    const give = Math.min(left, n.need)
+    left -= give
+    const after = Math.max(...n.run.map((h) => n.x.boardings[h] / ((Math.floor(n.x.vehicles[h]) + give) * n.x.norm)))
+    dests.push({ kind: 'route', route: n.x.route, color: n.x.color, own: n.x.place === r.place, give, before: n.max, after })
+  }
+  if (left > 0) dests.push({ ...park, give: left } as FreeDest)
+  const plans: FreePlan[] = []
+  if (dests.some((d) => d.kind === 'route')) plans.push({ key: 'help', title: 'Нуждающимся', dests })
+  plans.push({ key: 'park', title: 'В парк', dests: [park] })
+  return plans
+}
