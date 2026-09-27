@@ -1,0 +1,14 @@
+[
+  {
+    "id": "tram7_sakharov_july_2025",
+    "kind": "route_shortened",
+    "routes": [7],
+    "start_date": "2025-07-10",
+    "end_date": "2025-08-10",
+    "published_at": "2025-07-02",
+    "description": "Маршрут №7 сокращён до метро «Сокольники» из-за присоединения линии на проспекте Академика Сахарова; обычная трасса восстановлена 11 августа.",
+    "source_url": "https://transport.mos.ru/mostrans/all_news/125169",
+    "end_source_url": "https://www.mosmetro.ru/news/details/7570",
+    "end_published_at": "2025-08-11"
+  }
+]

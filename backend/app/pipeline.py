@@ -19,6 +19,7 @@ from app.config import DATA_DIR, DATASET_DIR
 from app.events import bus
 from app.ml import calendar as C
 from app.ml import geo as G
+from app.ml import route_events as E
 from app.ml import weather as W
 from app.ml.model import ROUTES, Coefficients, ModelParams, ProfileModel, full_grid, wape_score
 
@@ -45,7 +46,7 @@ PARAMS = ModelParams(lookback_days=28, trend_alpha=1.0, trend_days=7, weather_he
 STAGES = [
     ("ingest", "Приём сырых валидаций", "DuckDB читает train.csv + test.csv (≈10 ГБ) и сворачивает в маршрут × дата × час"),
     ("normalize", "Нормализация", "Полная сетка 10 маршрутов × 304 дня × 24 часа, нули в пропусках, сверка с labels"),
-    ("external", "Внешние данные", "Производственный календарь РФ, школьные каникулы Москвы, погода Open-Meteo"),
+    ("external", "Внешние данные", "Календарь РФ и Москвы, изменения движения, погода Open-Meteo"),
     ("geo", "Геопривязка", "Остановки из справочников + линии OpenStreetMap, веса остановок"),
     ("features", "Признаки", "Профили маршрут × тип дня × час, выпуск ТС, погодные корзины"),
     ("backtest", "Бэктест", "Скользящее окно: 5 периодов × 4 варианта модели, WAPE-score"),
@@ -238,6 +239,8 @@ class Pipeline:
         return m
 
     def _s_external(self, art: Artifacts, _f) -> dict:
+        events = E.load()
+        self.log("external", f"Изменения движения: {len(events)} подтверждённых событий; затронутые даты исключаются из обучения маршрута")
         self.progress("external", 0.2, "Open-Meteo archive API")
         art.weather_hourly = W.load_hourly()
         art.weather_daily = W.daily(art.weather_hourly)
@@ -249,7 +252,7 @@ class Pipeline:
         for r in nd.itertuples():
             self.log("external", f"  {r.date:%d.%m.%Y}: {r.day_type}{' (рабочая суббота)' if r.is_working_weekend else ''}{' ' + r.special if r.special else ''}")
         wn = art.weather_daily[(art.weather_daily.date >= SUB_START) & (art.weather_daily.date <= SUB_END)]
-        return {"weather_hours": len(art.weather_hourly), "holidays": n_hol,
+        return {"weather_hours": len(art.weather_hourly), "holidays": n_hol, "route_events": len(events),
                 "nov_dec_mean_temp": round(float(wn.t_mean.mean()), 1), "nov_dec_rain_days": int((wn.precip > 2).sum())}
 
     def _s_geo(self, art: Artifacts, _f) -> dict:

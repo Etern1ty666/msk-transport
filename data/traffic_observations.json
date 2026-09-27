@@ -1,0 +1,155 @@
+[
+  {
+    "id": "msk1_2025_03_06",
+    "date": "2025-03-06",
+    "score": 7,
+    "provider": "MSK1.ru (сообщение о загруженности)",
+    "observed_at": null,
+    "published_at": "2025-03-06T17:27:00+03:00",
+    "source_url": "https://msk1.ru/text/transport/2025/03/06/75188912/"
+  },
+  {
+    "id": "yandex_2025_03_07",
+    "date": "2025-03-07",
+    "score": 7,
+    "provider": "Яндекс.Карты",
+    "observed_at": null,
+    "published_at": "2025-03-07T16:35:00+03:00",
+    "source_url": "https://www.interfax.ru/moscow/1012551"
+  },
+  {
+    "id": "yandex_2025_03_27",
+    "date": "2025-03-27",
+    "score": 7,
+    "provider": "Яндекс.Карты",
+    "observed_at": null,
+    "published_at": "2025-03-27T19:04:00+03:00",
+    "source_url": "https://www.interfax.ru/moscow/1016977"
+  },
+  {
+    "id": "msk1_2025_04_21",
+    "date": "2025-04-21",
+    "score": 8,
+    "provider": "MSK1.ru (сообщение о загруженности)",
+    "observed_at": null,
+    "published_at": "2025-04-21T19:21:00+03:00",
+    "source_url": "https://msk1.ru/text/transport/2025/04/21/75368822/"
+  },
+  {
+    "id": "msk1_2025_04_29",
+    "date": "2025-04-29",
+    "score": 8,
+    "provider": "MSK1.ru (сообщение о загруженности)",
+    "observed_at": null,
+    "published_at": "2025-04-29T18:40:00+03:00",
+    "source_url": "https://msk1.ru/text/gorod/2025/04/29/75402743/"
+  },
+  {
+    "id": "yandex_2025_05_13",
+    "date": "2025-05-13",
+    "score": 8,
+    "provider": "Яндекс.Карты",
+    "observed_at": null,
+    "published_at": "2025-05-13T19:52:00+03:00",
+    "source_url": "https://www.interfax.ru/moscow/1025430"
+  },
+  {
+    "id": "msk1_2025_07_24",
+    "date": "2025-07-24",
+    "score": 7,
+    "provider": "MSK1.ru (сообщение о загруженности)",
+    "observed_at": null,
+    "published_at": "2025-07-24T13:07:00+03:00",
+    "source_url": "https://msk1.ru/text/transport/2025/07/24/75767041/"
+  },
+  {
+    "id": "codd_2025_09_19",
+    "date": "2025-09-19",
+    "score": 7,
+    "provider": "ЦОДД и Яндекс.Карты",
+    "observed_at": null,
+    "published_at": "2025-09-19T18:44:00+03:00",
+    "source_url": "https://www.interfax.ru/moscow/1048236"
+  },
+  {
+    "id": "yandex_2025_09_25",
+    "date": "2025-09-25",
+    "score": 9,
+    "provider": "Яндекс.Карты",
+    "observed_at": "2025-09-25T19:25:00+03:00",
+    "published_at": "2025-09-25T19:53:00+03:00",
+    "source_url": "https://www.interfax.ru/moscow/1049352"
+  },
+  {
+    "id": "msk1_2025_09_26",
+    "date": "2025-09-26",
+    "score": 7,
+    "provider": "MSK1.ru (сообщение о загруженности)",
+    "observed_at": null,
+    "published_at": "2025-09-26T18:46:00+03:00",
+    "source_url": "https://msk1.ru/text/transport/2025/09/26/76048667/"
+  },
+  {
+    "id": "msk1_2025_09_30",
+    "date": "2025-09-30",
+    "score": 7,
+    "provider": "MSK1.ru (сообщение о загруженности)",
+    "observed_at": null,
+    "published_at": "2025-09-30T19:57:00+03:00",
+    "source_url": "https://msk1.ru/text/transport/2025/09/30/76053676/"
+  },
+  {
+    "id": "codd_2025_10_10",
+    "date": "2025-10-10",
+    "score": 5,
+    "provider": "ЦОДД",
+    "observed_at": null,
+    "published_at": "2025-10-10",
+    "source_url": "https://transport.mos.ru/mostrans/all_news/126705"
+  },
+  {
+    "id": "codd_2025_10_14",
+    "date": "2025-10-14",
+    "score": 7,
+    "provider": "ЦОДД",
+    "observed_at": null,
+    "published_at": "2025-10-14T18:49:00+03:00",
+    "source_url": "https://www.interfax.ru/moscow/1052610"
+  },
+  {
+    "id": "msk1_2025_10_15",
+    "date": "2025-10-15",
+    "score": 8,
+    "provider": "MSK1.ru (сообщение о загруженности)",
+    "observed_at": null,
+    "published_at": "2025-10-15T19:16:00+03:00",
+    "source_url": "https://msk1.ru/text/incidents/2025/10/15/76076688/"
+  },
+  {
+    "id": "msk1_2025_10_23",
+    "date": "2025-10-23",
+    "score": 7,
+    "provider": "MSK1.ru (сообщение о загруженности)",
+    "observed_at": null,
+    "published_at": "2025-10-23T18:22:00+03:00",
+    "source_url": "https://msk1.ru/text/transport/2025/10/23/76088820/"
+  },
+  {
+    "id": "msk1_2025_10_29",
+    "date": "2025-10-29",
+    "score": 8,
+    "provider": "MSK1.ru (сообщение о загруженности)",
+    "observed_at": null,
+    "published_at": "2025-10-29T15:32:00+03:00",
+    "source_url": "https://msk1.ru/text/transport/2025/10/29/76097325/"
+  },
+  {
+    "id": "yandex_2025_10_31",
+    "date": "2025-10-31",
+    "score": 8,
+    "provider": "Яндекс.Карты",
+    "observed_at": null,
+    "published_at": "2025-10-31T18:27:00+03:00",
+    "source_url": "https://www.interfax.ru/moscow/1055836"
+  }
+]
