@@ -136,6 +136,7 @@ export const loadColor = (ratio: number) =>
 export type DayRoute = {
   route: number; name: string; color: string; boardings: number[]; vehicles: number[]; ratio: number[]
   extra: number[]; norm: number; day_total: number; peak_hour: number | null
+  pay_mix?: number[][] | null // доли типов оплаты по часам (порядок — DayView.pay_cats)
   place: string | null // площадка (депо), к которой приписан маршрут
 }
 /** Площадка на сутки: парк, пиковый выпуск (p90 будней), вагоны её маршрутов на линии и готовые в парке по часам. */
@@ -149,6 +150,7 @@ export type DayView = {
   weather: { temp: number[]; precip: number[]; snow: number[] } | null
   routes: DayRoute[]
   depots: Record<string, Depot> | null
+  pay_cats?: { key: string; title: string }[] | null
   network: { boardings: number[]; max_ratio: number[]; problems: number[] }
 }
 export const levelOf = (r: number): 'low' | 'mid' | 'high' | 'crit' => (r < 0.7 ? 'low' : r < 1 ? 'mid' : r < 1.2 ? 'high' : 'crit')
@@ -178,16 +180,26 @@ export function problemWindows(r: DayRoute, thr = 1.0) {
   return out
 }
 
-/** Донор отдаёт вагоны, только если сам остаётся не выше этой доли норматива во все часы окна. */
-export const DONOR_MAX = 0.85
+/** Выше этой загрузки ветке уже предлагаем свободные вагоны (если перегруженным хватает). */
+export const SOFT = 0.8
+/** Донор отдаёт вагоны, только если сам остаётся не выше этой доли норматива во все часы окна —
+ *  не выше порога «предложить вагоны», чтобы донор сам не стал кандидатом. */
+export const DONOR_MAX = SOFT
+/** Сколько вагонов добавить, чтобы в час h загрузка стала не выше SOFT. */
+export const softExtra = (r: DayRoute, h: number) =>
+  r.vehicles[h] > 0 ? Math.max(0, Math.ceil(r.boardings[h] / (SOFT * r.norm)) - Math.floor(r.vehicles[h])) : 0
 export type VehicleSource =
   | { kind: 'depot'; place: string; name: string; avail: number; take: number; own: boolean }
   | { kind: 'route'; route: number; color: string; place: string; own: boolean; avail: number; take: number; before: number; after: number }
 
-/** Откуда взять `need` вагонов на маршрут `r` в часы from..to: сначала готовые в парке своей площадки,
- *  затем ветки той же площадки с запасом (вагоны площадки и так ходят по разным её маршрутам), затем другие площадки. */
-export function vehicleSources(r: DayRoute, list: DayRoute[], depots: Record<string, Depot> | null | undefined,
-  from: number, to: number, need: number) {
+export type VehiclePlan = { key: string; title: string; sources: VehicleSource[]; left: number }
+export type Reserved = { route: number; color: string; take: number }
+
+/** Откуда взять `need` вагонов на маршрут `r` в часы from..to — несколько вариантов:
+ *  «быстрее всего» — сначала готовые в парке своей площадки, затем ветки той же площадки с запасом, затем другие площадки;
+ *  «одним источником» — один парк или одна ветка закрывают всё сразу; «без парка» — только снять с веток с запасом. */
+export function vehicleVariants(r: DayRoute, list: DayRoute[], depots: Record<string, Depot> | null | undefined,
+  from: number, to: number, need: number, soft = false): { plans: VehiclePlan[]; reserved: Reserved[] } {
   const hours = Array.from({ length: to - from + 1 }, (_, i) => from + i)
   const cands: VehicleSource[] = []
   for (const [p, d] of Object.entries(depots ?? {})) {
@@ -203,15 +215,55 @@ export function vehicleSources(r: DayRoute, list: DayRoute[], depots: Record<str
   }
   const rank = (s: VehicleSource) => (s.own ? 0 : 2) + (s.kind === 'depot' ? 0 : 1)
   cands.sort((a, b) => rank(a) - rank(b) || b.avail - a.avail)
-  let left = need
-  for (const s of cands) {
-    if (left <= 0) break
-    s.take = Math.min(s.avail, left)
-    left -= s.take
-    if (s.kind === 'route') {
-      const x = list.find((q) => q.route === s.route)!
-      s.after = Math.max(...hours.map((h) => x.boardings[h] / ((Math.floor(x.vehicles[h]) - s.take) * x.norm)))
+  // ветке выше 80%, но в пределах норматива, даём только то, что останется после перегруженных веток этих же часов
+  const reserved: Reserved[] = []
+  if (soft) {
+    const hot = list.filter((x) => x.route !== r.route && hours.some((h) => x.vehicles[h] > 0 && x.ratio[h] >= 1))
+      .sort((a, b) => Math.max(...hours.map((h) => b.ratio[h])) - Math.max(...hours.map((h) => a.ratio[h])))
+    for (const x of hot) {
+      let left = Math.max(...hours.map((h) => x.extra[h]))
+      const want = left
+      const own = (c: VehicleSource) => (c.place === x.place ? 0 : 2) + (c.kind === 'depot' ? 0 : 1)
+      for (const c of [...cands].sort((a, b) => own(a) - own(b) || b.avail - a.avail)) {
+        if (left <= 0) break
+        const t = Math.min(c.avail, left)
+        c.avail -= t
+        left -= t
+      }
+      if (want - left > 0) reserved.push({ route: x.route, color: x.color, take: want - left })
     }
+    for (let i = cands.length - 1; i >= 0; i--) if (cands[i].avail <= 0) cands.splice(i, 1)
   }
-  return { sources: cands.filter((s) => s.take > 0), spare: cands.filter((s) => s.take === 0).slice(0, 3), left: Math.max(0, left) }
+  const plan = (key: string, title: string, pool: VehicleSource[]): VehiclePlan => {
+    let left = need
+    const sources: VehicleSource[] = []
+    for (const c of pool) {
+      if (left <= 0) break
+      const s = { ...c, take: Math.min(c.avail, left) }
+      left -= s.take
+      if (s.kind === 'route') {
+        const x = list.find((q) => q.route === s.route)!
+        s.after = Math.max(...hours.map((h) => x.boardings[h] / ((Math.floor(x.vehicles[h]) - s.take) * x.norm)))
+      }
+      sources.push(s)
+    }
+    return { key, title, sources, left: Math.max(0, left) }
+  }
+  const id = (s: VehicleSource) => (s.kind === 'depot' ? `d${s.place}` : `r${s.route}`)
+  const all = [plan('fast', 'Быстрее', cands)]
+  const single = cands.filter((c) => c.avail >= need)
+  for (const c of [...single.filter((c) => c.kind === 'route'), ...single.filter((c) => c.kind === 'depot')].slice(0, 2))
+    all.push(plan(`one-${id(c)}`, c.kind === 'route' ? `Только №${c.route}` : 'Только парк', [c]))
+  const routesOnly = cands.filter((c) => c.kind === 'route')
+  if (routesOnly.length) all.push(plan('routes', 'Ветками', [...routesOnly].sort((a, b) => b.avail - a.avail)))
+  // одинаковые по составу варианты не повторяем; неполные — только если полных нет
+  const seen = new Set<string>()
+  const uniq = all.filter((p) => {
+    const sig = p.sources.map((s) => `${id(s)}:${s.take}`).sort().join()
+    if (!p.sources.length || seen.has(sig)) return false
+    seen.add(sig)
+    return true
+  })
+  const full = uniq.filter((p) => p.left === 0)
+  return { plans: (full.length ? full : uniq.slice(0, 1)).slice(0, 3), reserved }
 }

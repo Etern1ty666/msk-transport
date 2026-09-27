@@ -100,6 +100,6 @@ export const routeColor = (meta: Meta | null, r: number | string) =>
 export const tooltipStyle = {
   contentStyle: { background: '#111a2e', border: '1px solid #22314f', borderRadius: 8, fontSize: 12 },
   labelStyle: { color: '#e2e8f0' },
-  itemStyle: { padding: 0 },
+  itemStyle: { padding: 0, color: '#e2e8f0' }, // иначе recharts красит значение в цвет столбика — на тёмном фоне не читается
 }
 export const axis = { stroke: '#8b9ab5', fontSize: 11, tickLine: false }

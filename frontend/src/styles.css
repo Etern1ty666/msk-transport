@@ -115,7 +115,7 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .metrics span { font-size: 11px; background: rgba(255,255,255,.04); border-radius: 6px; padding: 2px 6px; color: var(--muted); }
 .metrics span b { color: var(--text); font-weight: 500; }
 .console { background: #070b14; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; height: 380px; overflow: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
-.console .ts { color: #475569; }
+.console .ts { color: #7c8aa3; }
 .console .st { color: var(--accent-2); }
 .console .warn { color: var(--warn); }
 .console .error { color: var(--bad); }
@@ -985,15 +985,19 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .sch-tip .st-r { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
 .sch-mm { color: #ef4444; font-weight: 800; }
 
-/* панель маршрутов: кнопки всегда в цвет маршрута, загрузка — огонёк внутри кнопки (не выходит за её край) */
-.rb-chip { position: relative; overflow: hidden; }
+/* панель маршрутов: кнопки в цвет маршрута; перегрузка — красная обводка, «+N%» на кнопке и крупный мигающий маячок */
+.rb-chip { position: relative; }
 .rb-chip.dim, .rb-chip.idle:not(.on) { opacity: 1; }
-.rb-led { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; pointer-events: none;
-  background: #fde68a; box-shadow: 0 0 0 1.5px rgba(0,0,0,.25), 0 0 calc(2px + 5px * var(--k)) rgba(253,230,138,calc(.4 + .5 * var(--k)));
-  animation: rbLed calc(1.8s - 1.1s * var(--k)) ease-in-out infinite; opacity: calc(.55 + .45 * var(--k)); }
-.rb-led.high { background: #fdba74; box-shadow: 0 0 0 1.5px rgba(0,0,0,.25), 0 0 calc(2px + 6px * var(--k)) rgba(253,186,116,.9); }
-.rb-led.crit { background: #fecaca; box-shadow: 0 0 0 1.5px rgba(127,29,29,.45), 0 0 calc(3px + 7px * var(--k)) rgba(248,113,113,1); }
-@keyframes rbLed { 50% { opacity: calc(.25 + .35 * var(--k)); transform: scale(calc(.8 + .1 * var(--k))); } }
+.rb-chip.hot { gap: 6px; grid-auto-flow: column; padding: 0 5px 0 9px; animation: rbHot 1.1s ease-in-out infinite; }
+.rb-chip.hot.on { animation: none; }
+.rb-chip.hot em { font-style: normal; font-size: 11.5px; font-weight: 800; color: #fff; background: #dc2626; border-radius: 5px; padding: 0 5px; line-height: 20px;
+  text-shadow: none; font-variant-numeric: tabular-nums; }
+.rb-led { position: absolute; z-index: 2; top: -5px; right: -5px; width: 12px; height: 12px; border-radius: 50%; pointer-events: none;
+  background: #ef4444; box-shadow: 0 0 0 2px rgba(11,17,32,.95), 0 0 10px rgba(239,68,68,.9); animation: rbLed .9s ease-in-out infinite; }
+.rb-led::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #ef4444; animation: rbRing .9s ease-out infinite; }
+@keyframes rbLed { 50% { opacity: .35; transform: scale(.8); } }
+@keyframes rbRing { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(2.4); } }
+@keyframes rbHot { 0%, 100% { box-shadow: 0 0 0 2px rgba(239,68,68,.95); } 50% { box-shadow: 0 0 0 2px rgba(239,68,68,.95), 0 0 0 6px rgba(239,68,68,0), 0 0 14px rgba(239,68,68,.55); } }
 
 /* состояние сети, когда проблем нет: оператор видит, что прогноз посчитан и всё спокойно */
 .okchip { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 10px; border-radius: 999px; max-width: 100%;
@@ -1009,6 +1013,17 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .okchip.calc i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(34,211,238,.3); border-top-color: #22d3ee; animation: spin .8s linear infinite; flex: none; }
 @keyframes okBreath { 50% { opacity: .45; } }
 @media (max-width: 720px) { .okchip { justify-self: start; } }
+/* три отдельные плашки сети: пассажиры за час (цвет по загрузке), вагоны на линии, следующий рост */
+.okrow { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.okchip.people { --pc: #4ade80; border-color: color-mix(in srgb, var(--pc) 55%, transparent); color: var(--pc); transition: color .4s, border-color .4s; }
+.okchip.people b { color: var(--pc); font-size: 14px; }
+.okrow .okchip { border-color: rgba(148,163,184,.3); color: var(--muted); }
+.okrow .okchip b { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
+.okrow .okchip.people { border-color: color-mix(in srgb, var(--pc) 55%, transparent); color: var(--pc); }
+.okrow .okchip.people b { color: var(--pc); }
+.okrow .okchip.next { border-color: rgba(251,146,60,.45); color: #fdba74; }
+.okrow .okchip svg { animation: none; }
+@media (max-width: 720px) { .okrow { justify-content: flex-start; } }
 
 /* производительность: под панелями постоянно анимируется схема/карта — размытие фона пришлось бы пересчитывать каждый кадр
    (заметно тормозит, особенно в Safari и на больших retina-экранах). Панели и так почти непрозрачные — делаем их плотнее без blur */
@@ -1300,30 +1315,6 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .sd-down { animation: none; } }
 
 /* ---------- вагоны ветки: сколько на линии и откуда взять недостающие ---------- */
-.fleet { display: grid; gap: 8px; margin-top: 4px; }
-.fleet-add { justify-self: start; display: inline-flex; align-items: center; gap: 7px; border: 0; cursor: pointer;
-  border-radius: 999px; padding: 5px 11px 5px 5px; font: inherit; font-size: 13px; color: var(--text);
-  background: rgba(34,211,238,.12); box-shadow: inset 0 0 0 1px rgba(34,211,238,.3); transition: background .15s; }
-.fleet-add:hover, .fleet-add.on { background: rgba(34,211,238,.2); }
-.fleet-add .plus { background: var(--accent); color: #04111d; border-radius: 999px; padding: 2px 9px; font-weight: 700;
-  font-variant-numeric: tabular-nums; }
-.fleet-add .caret { transition: transform .2s; opacity: .8; }
-.fleet-add.on .caret { transform: rotate(180deg); }
-.fleet-src { display: grid; gap: 8px; background: var(--surface, rgba(148,163,184,.08)); border-radius: 10px; padding: 10px 12px;
-  animation: fleetIn .18s ease-out; }
-@keyframes fleetIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.fs-head { font-size: 13px; color: var(--muted); }
-.fs-head b { color: var(--text); }
-.fs-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
-.fs-ico { width: 28px; height: 24px; border-radius: 7px; display: grid; place-items: center; background: var(--surface-2, rgba(148,163,184,.13)); color: #cbd5e1; }
-.fs-t { display: grid; gap: 1px; min-width: 0; }
-.fs-t b { font-size: 13.5px; font-weight: 600; }
-.fs-t span { font-size: 12px; color: var(--muted); }
-.fs-t em { font-style: normal; font-weight: 600; }
-.fs-take { color: var(--accent); font-size: 17px; font-variant-numeric: tabular-nums; }
-.fs-left { font-size: 12.5px; line-height: 1.4; color: #fca5a5; }
-.fs-note { font-size: 11.5px; line-height: 1.45; color: var(--muted); border-top: 1px solid var(--hair, rgba(148,163,184,.14)); padding-top: 7px; }
-
 /* шапка карточки: номер ветки и вагоны на линии «🚋 ×13» */
 .sd-id { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
 
@@ -1351,20 +1342,63 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .winchip { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
 .winchip b { font-weight: 700; }
 .ops-side h4.ih { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
-/* «откуда взять»: кнопка в строке статуса, список — на всю ширину под ней */
-.fleet { display: contents; }
-.fleet-add { justify-self: auto; margin-left: auto; padding: 4px 9px 4px 4px; }
-.fleet-src { flex-basis: 100%; }
-.fs-head { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.fs-head b { color: var(--text); font-size: 15px; }
+/* схема переброски вагонов: [откуда] → [ветка] 🚋 +N, вагончик бежит по стрелке; несколько вариантов вкладками */
+.fplan { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 4px; padding: 11px 12px 12px; border-radius: 12px; background: rgba(11,17,32,.35);
+  box-shadow: inset 0 0 0 1px rgba(34,211,238,.22); animation: fleetIn .2s ease-out; }
+.fplan.now { box-shadow: inset 0 0 0 1px rgba(239,68,68,.4); }
+@keyframes fleetIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.fp-head { display: flex; align-items: center; flex-wrap: wrap; row-gap: 6px; gap: 8px; white-space: nowrap; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fp-when { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; font-weight: 700; font-size: 12px;
+  background: rgba(34,211,238,.14); color: var(--accent); }
+.fplan.now .fp-when { background: rgba(239,68,68,.16); color: #fca5a5; }
+.fplan.soft { box-shadow: inset 0 0 0 1px rgba(251,146,60,.35); }
+.fplan.soft .fp-when { background: rgba(251,146,60,.16); color: #fdba74; }
+.fp-when em { font-style: normal; font-size: 11px; padding-left: 5px; margin-left: 1px; border-left: 1px solid currentColor; opacity: .9; }
+.fs-left.soft { color: var(--muted); }
+.fs-left.soft b { color: #fdba74; font-size: 13px; }
+.fp-res { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--muted); cursor: help; }
+.fp-res svg { color: #86efac; }
+.fp-resi { display: inline-flex; align-items: center; gap: 3px; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.fp-span { color: var(--text); font-weight: 600; }
+.fp-need { display: inline-flex; align-items: center; gap: 4px; }
+.fp-need b { color: var(--text); font-size: 15px; }
 .fs-info { margin-left: auto; display: inline-grid; cursor: help; }
-.fs-t { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.fs-avail, .fs-load { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.fs-row { cursor: default; }
-.fs-row.far { opacity: .85; }
+.fp-tabs { min-width: 0; display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(148,163,184,.08); }
+.fp-tabs button { flex: 1 1 auto; min-width: 0; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; border: 0; border-radius: 8px;
+  background: none; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; overflow: hidden; transition: background .15s, color .15s; }
+.fp-tabs button:hover { color: var(--text); }
+.fp-tabs button.on { background: rgba(34,211,238,.16); color: var(--text); box-shadow: inset 0 0 0 1px rgba(34,211,238,.35); }
+.fp-tt { overflow: hidden; text-overflow: ellipsis; }
+.fp-tchip { height: 18px; min-width: 22px; font-size: 11px; border-radius: 5px; }
+.fp-tchip.depot { display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; background: rgba(148,163,184,.2); color: #e2e8f0; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; }
+.fp-tabs i { font-style: normal; width: 16px; height: 16px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10.5px; flex: none;
+  background: rgba(148,163,184,.2); color: var(--text); }
+.fp-tabs button.on i { background: var(--accent); color: #04111d; }
+.fp-rows { display: grid; gap: 8px; }
+.fp-row { min-width: 0; display: grid; grid-template-columns: minmax(0, auto) minmax(40px, 1fr) auto auto; align-items: center; gap: 8px; cursor: default;
+  animation: fpIn .3s ease-out both; animation-delay: calc(var(--i) * 70ms); }
+@keyframes fpIn { from { opacity: 0; transform: translateX(-6px); } }
+.fp-src.depot { min-width: 0; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: 7px; font-size: 12px; font-weight: 700;
+  background: rgba(148,163,184,.16); color: #e2e8f0; white-space: nowrap; }
+.fp-track { position: relative; height: 30px; min-width: 0; }
+.fp-line { position: absolute; left: 0; right: 6px; top: 11px; height: 2px; border-radius: 2px;
+  background: repeating-linear-gradient(90deg, rgba(34,211,238,.75) 0 6px, transparent 6px 11px); background-size: 22px 2px; animation: fpFlow .8s linear infinite; }
+.fp-line::after { content: ''; position: absolute; right: -7px; top: -4px; border: 5px solid transparent; border-left: 7px solid rgba(34,211,238,.9); border-right: 0; }
+@keyframes fpFlow { to { background-position: 22px 0; } }
+.fp-row.far .fp-line { background-image: repeating-linear-gradient(90deg, rgba(253,186,116,.75) 0 6px, transparent 6px 11px); }
+.fp-row.far .fp-line::after { border-left-color: rgba(253,186,116,.9); }
+.fp-car { position: absolute; top: 3px; left: 0; color: #e2e8f0; display: inline-grid; padding: 0 2px; border-radius: 4px; background: #16223b;
+  animation: fpCar 2.4s cubic-bezier(.45,0,.55,1) infinite; animation-delay: calc(var(--i) * 300ms); }
+@keyframes fpCar { 0% { left: 0; opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { left: calc(100% - 30px); opacity: 0; } }
+.fp-sub { position: absolute; left: 0; right: 0; bottom: -2px; display: flex; align-items: center; justify-content: center; gap: 3px;
+  font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fp-sub em { font-style: normal; font-weight: 700; }
+.fp-take { min-width: 40px; display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; color: var(--accent); font-size: 16px; font-variant-numeric: tabular-nums; }
 .far-ico { color: #fdba74; flex: none; }
-.fs-left { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: help; }
-.fs-left b { font-variant-numeric: tabular-nums; }
+.fs-left { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #fca5a5; cursor: help; }
+.fs-left b { font-variant-numeric: tabular-nums; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .fp-line, .fp-car, .fp-row { animation: none; } .fp-car { left: 40%; } }
 /* плашки на карте */
 .okchip .warn { color: #fdba74; }
 .okchip span { font-variant-numeric: tabular-nums; }
@@ -1407,3 +1441,36 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
   background: none; color: var(--muted); cursor: pointer; border-radius: 8px; transition: color .15s; }
 .sd-close:hover { color: var(--text); }
 .sd-name .t { display: inline-block; }
+
+/* плитки карточки ветки — кнопки: по нажатию под ними на всю ширину раскрываются подробности */
+.stat.tap { border: 0; font: inherit; text-align: left; cursor: pointer; color: var(--muted); transition: background .15s, box-shadow .15s; }
+.facts.glyph-facts > .stat.tap:hover { background: rgba(148,163,184,.14); }
+.facts.glyph-facts > .stat.tap.on { background: rgba(34,211,238,.12); box-shadow: inset 0 0 0 1px rgba(34,211,238,.4); color: var(--accent); }
+.tdet { display: grid; gap: 2px; margin-top: -4px; padding: 10px 12px; border-radius: 10px; background: var(--surface, rgba(148,163,184,.08));
+  box-shadow: inset 0 0 0 1px rgba(34,211,238,.25); animation: fleetIn .18s ease-out; }
+.td-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; margin-bottom: 6px; }
+.td-h b { font-size: 14px; }
+.td-h span { margin-left: auto; white-space: nowrap; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.td-r { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 10px; padding: 4px 0; font-size: 13px; }
+.td-r + .td-r { border-top: 1px solid var(--hair, rgba(148,163,184,.14)); }
+.td-k { color: var(--muted); }
+.td-v { font-variant-numeric: tabular-nums; font-weight: 700; }
+.td-bar { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: rgba(148,163,184,.12); margin-top: 4px; overflow: hidden; }
+.td-bar i { display: block; height: 100%; border-radius: 2px; background: var(--accent); transition: width .3s; }
+.td-note { display: flex; align-items: center; gap: 5px; margin: 6px 0 0; font-size: 11.5px; color: var(--muted); cursor: help; }
+.td-go { justify-self: start; display: inline-flex; align-items: center; gap: 2px; margin-top: 6px; height: 28px; padding: 0 8px 0 11px; border: 0; border-radius: 8px;
+  background: rgba(34,211,238,.14); color: var(--accent); font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.td-go:hover { background: rgba(34,211,238,.22); }
+
+/* раскрытая плитка — как вкладка: нажатая плитка перетекает в блок подробностей на всю ширину, остальные плитки остаются отдельными */
+.facts-box { --tab: #1a2a3e; display: grid; }
+.facts-box .facts.glyph-facts > .stat.tap.on { position: relative; background: var(--tab); box-shadow: none; color: var(--accent);
+  border-radius: 10px 10px 0 0; margin-bottom: -8px; padding-bottom: 17px; }
+/* вогнутые скругления там, где плитка встречается с блоком */
+.facts-box .stat.tap.on::before, .facts-box .stat.tap.on::after { content: ''; position: absolute; bottom: 0; width: 8px; height: 8px; pointer-events: none; }
+.facts-box .stat.tap.on::before { left: -8px; background: radial-gradient(circle at 0 0, transparent 7.5px, var(--tab) 8px); }
+.facts-box .stat.tap.on::after { right: -8px; background: radial-gradient(circle at 100% 0, transparent 7.5px, var(--tab) 8px); }
+.facts-box .stat.tap.on:first-child::before, .facts-box .stat.tap.on:last-child::after { display: none; }
+.facts-box .tdet { margin-top: 8px; background: var(--tab); box-shadow: none; border-radius: 12px; padding: 12px 14px 14px; animation: fadein .15s ease-out; }
+.facts-box[data-tab="0"] .tdet { border-top-left-radius: 0; }
+.facts-box[data-tab="2"] .tdet { border-top-right-radius: 0; }

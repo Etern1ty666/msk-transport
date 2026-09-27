@@ -12,6 +12,7 @@ import pandas as pd
 from app.config import DATA_DIR
 from app.ml import calendar as C
 from app.ml import depots as DEP
+from app.ml import paymix as PAY
 from app.ml import geo as G
 from app.ml.model import ROUTES, Coefficients
 from app.ml.weather import SOURCE as WEATHER_SOURCE
@@ -76,6 +77,7 @@ class Store:
         self.dow = self.days.dayofweek.to_numpy()
         self.target = np.array([self.art.bpv_target.get(r, 110.0) for r in ROUTES])
         self.depots = DEP.load()  # площадки и выпуск вагонов (data/depots.json)
+        self.paymix = PAY.load()  # доли типов оплаты по маршруту и часу (data/paymix.json)
         self._ycache: dict[tuple, np.ndarray] = {}
 
     def yhat_tensor(self, coef: Coefficients) -> np.ndarray:
@@ -321,6 +323,7 @@ class Store:
                 "norm": round(float(self.target[i]), 1), "day_total": round(float(y[i].sum())),
                 "peak_hour": int(y[i].argmax()) if y[i].max() > 0 else None,
                 "place": self.depots["route_place"].get(str(r)) if self.depots else None,
+                "pay_mix": self.paymix["routes"].get(str(r), {}).get("hours") if self.paymix else None,
             })
         return {
             "date": date, "dow": int(ts.dayofweek), "day_type": cal.day_type, "special": cal.special,
@@ -331,6 +334,7 @@ class Store:
             },
             "routes": routes,
             "depots": self._depots_day(veh),
+            "pay_cats": self.paymix["cats"] if self.paymix else None,
             "network": {"boardings": [round(float(v)) for v in y.sum(0)],
                         "max_ratio": [round(float(v), 3) for v in ratio.max(0)],
                         "problems": [int(v) for v in (ratio >= 1.0).sum(0)]},

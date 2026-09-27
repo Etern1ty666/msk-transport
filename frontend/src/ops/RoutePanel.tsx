@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowLeftRight, ChartPie, Clock, FileSpreadsheet, Info, ListOrdered, ShieldCheck, Sigma, TrendingUp, TriangleAlert, Users, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { ArrowDown, ArrowLeftRight, Banknote, ChartPie, ChevronRight, Clock, FileSpreadsheet, Info, ListOrdered, ShieldCheck, TrendingUp, TriangleAlert, Users, X } from 'lucide-react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
-import { exportUrl, fmt, LEVEL_COLORS, LEVEL_TITLE, levelOf, problemWindows, type DayRoute, type Depot, type RouteGeo, type Stop } from '../api'
+import { exportUrl, fmt, LEVEL_COLORS, LEVEL_TITLE, levelOf, problemWindows, SOFT, softExtra, type DayRoute, type Depot, type RouteGeo, type Stop } from '../api'
 import { axis, tooltipStyle, useApp } from '../components'
 import Fleet, { TramSide } from './Fleet'
 import { hspan, Stat } from './Glyphs'
@@ -10,6 +10,8 @@ import FleetStrip from './FleetStrip'
 type Props = {
   route: DayRoute; geo?: RouteGeo; allGeo: RouteGeo[]; list: DayRoute[]; depots?: Record<string, Depot> | null
   date: string; hour: number; stopId: string | null
+  timeRef: RefObject<number> // минута ленты времени: оплаты с 00:00 растут вместе с ползунком
+  payCats?: { key: string; title: string }[] | null
   keys: boolean // ↑/↓ листают, пока поверх карты ничего не открыто
   onClose: () => void; onHour: (h: number) => void; onStop: (id: string | null) => void
   onRoute: (route: number, stopId: string | null) => void
@@ -46,6 +48,71 @@ function DayBars({ values, levels, hour, onHour, unit }: { values: number[]; lev
       </BarChart>
     </ResponsiveContainer>
   )
+}
+
+const p2 = (n: number) => String(n).padStart(2, '0')
+const hm = (m: number) => `${p2(Math.floor(m / 60))}:${p2(Math.floor(m % 60))}`
+const ddmm = (date: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}`
+
+/** Минута ленты времени: читаем ref каждый кадр и перерисовываем только того, кто её показывает (не всю карточку). */
+function useMinute(timeRef: RefObject<number>) {
+  const [m, setM] = useState(() => Math.floor(timeRef.current ?? 0))
+  useEffect(() => {
+    let raf = 0
+    const tick = () => { const v = Math.floor(timeRef.current ?? 0); setM((p) => (p === v ? p : v)); raf = requestAnimationFrame(tick) }
+    tick()
+    return () => cancelAnimationFrame(raf)
+  }, [timeRef])
+  return m
+}
+/** Накоплено с 00:00 до минуты: целые часы + доля текущего часа. */
+const cumAt = (vals: number[], minute: number) => {
+  const m = Math.max(0, Math.min(24 * 60, minute)), h = Math.floor(m / 60)
+  let s = 0
+  for (let i = 0; i < h; i++) s += vals[i]
+  return h < 24 ? s + vals[h] * (m % 60) / 60 : s
+}
+function LiveSum({ vals, timeRef, approx }: { vals: number[]; timeRef: RefObject<number>; approx?: boolean }) {
+  const m = useMinute(timeRef)
+  return <>{approx ? '≈' : ''}{fmt(Math.round(cumAt(vals, m)))}</>
+}
+
+/** Раскрытая плитка: строка на всю ширину под плитками — заголовок и «название — значение». */
+function Detail({ title, sub, rows, foot }: { title: ReactNode; sub?: ReactNode; rows: { k: string; v: ReactNode; share?: number; color?: string }[]; foot?: ReactNode }) {
+  return (
+    <div className="tdet">
+      <div className="td-h"><b>{title}</b>{sub && <span>{sub}</span>}</div>
+      {rows.map((r) => (
+        <div key={r.k} className="td-r">
+          <span className="td-k">{r.k}</span>
+          <b className="td-v" style={r.color ? { color: r.color } : undefined}>{r.v}</b>
+          {r.share != null && <i className="td-bar"><i style={{ width: `${Math.round(r.share * 100)}%` }} /></i>}
+        </div>
+      ))}
+      {foot}
+    </div>
+  )
+}
+
+/** Успешные оплаты с 00:00 до минуты ленты — по типам оплаты (доли из истории по маршруту и часу). */
+function PayDetail({ vals, mix, cats, date, timeRef, where }: {
+  vals: number[]; mix?: number[][] | null; cats?: { key: string; title: string }[] | null; date: string; timeRef: RefObject<number>; where?: string
+}) {
+  const m = useMinute(timeRef)
+  const total = Math.round(cumAt(vals, m))
+  const rows: { k: string; v: ReactNode; share?: number }[] = []
+  if (mix && cats?.length) {
+    const raw = cats.map((_, k) => cumAt(vals.map((v, h) => v * (mix[h]?.[k] ?? 0)), m))
+    // округляем так, чтобы сумма по типам совпала с итогом
+    const n = raw.map(Math.floor)
+    let rest = total - n.reduce((a, b) => a + b, 0)
+    for (const k of raw.map((v, k) => [v - Math.floor(v), k]).sort((a, b) => b[0] - a[0]).map(([, k]) => k)) { if (rest <= 0) break; n[k]++; rest-- }
+    cats.forEach((c, k) => rows.push({ k: c.title, v: fmt(n[k]), share: total ? n[k] / total : 0 }))
+  }
+  rows.push({ k: 'Всего', v: fmt(total) })
+  return <Detail title={`Успешные оплаты${where ? ` ${where}` : ''} за ${ddmm(date)}`} sub={`00:00–${hm(m)}`} rows={rows}
+    foot={<p className="td-note" title="Наличных в трамвае нет: оплата картой «Тройка», банковской картой, проездным, льготной картой или билетом. Доли — по валидациям последних 4 недель этого маршрута в этот час">
+      <Info size={12} />наличных в валидациях нет — только карты и билеты</p>} />
 }
 
 const GAP = 54 // шаг между остановками на ленте, px — диагональные подписи в 2–3 строки не наезжают
@@ -133,7 +200,9 @@ function StopStrip({ stops, color, sel, onPick }: { stops: Stop[]; color: string
   )
 }
 
-export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, hour, stopId, keys, onClose, onHour, onStop, onRoute }: Props) {
+export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, hour, stopId, timeRef, payCats, keys, onClose, onHour, onStop, onRoute }: Props) {
+  const [tile, setTile] = useState<'now' | 'pay' | 'peak' | null>(null)
+  const tap = (k: 'now' | 'pay' | 'peak') => () => setTile((t) => (t === k ? null : k))
   const { coef } = useApp()
   const on = r.vehicles[hour] > 0
   const lvl = levelOf(r.ratio[hour])
@@ -215,10 +284,14 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
       <div className="ops-side sd">
         {head}
         <div className="sd-body" ref={body}>
+          <div className="facts-box" data-tab={tile === 'pay' ? 0 : undefined}>
           <div className="facts glyph-facts">
-            <Stat big icon={Sigma} v={`≈${fmt(r.day_total * stop.weight)}`} tip="Посадок на остановке за сутки" />
+            <Stat big icon={Banknote} v={<LiveSum vals={vals} timeRef={timeRef} approx />} on={tile === 'pay'} onClick={tap('pay')}
+              tip="Успешных оплат на остановке с 00:00 до времени на ленте (прогноз; одна успешная валидация = одна посадка) — нажмите, чтобы раскрыть" />
             <Stat big icon={TrendingUp} v={hh(peak)} tip={`Пик на остановке: ≈${fmt(vals[peak])} посадок в час`} />
             <Stat big icon={ListOrdered} v={`${rank}/${stops.length}`} tip={`${rank}-я из ${stops.length} остановок по посадкам`} />
+          </div>
+          {tile === 'pay' && <PayDetail vals={vals} mix={r.pay_mix} cats={payCats} date={date} timeRef={timeRef} where="на остановке" />}
           </div>
 
           <div className="hero" style={{ borderColor: `${color}66`, background: `${color}14` }}>
@@ -272,15 +345,53 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
   // ---------- режим ветки: общая информация ----------
   const cur = wins.find((w) => hour >= w.from && hour <= w.to)
   const next = wins.find((w) => w.from > hour)
+  // схема переброски — за час до перегрузки и пока она идёт
+  const hardWin = cur ?? (next && next.from - hour <= 1 ? next : null)
+  // выше 80%, но в нормативе — тоже предлагаем свободные вагоны (за час до и пока держится), до первого часа перегрузки
+  let softWin: { from: number; to: number; extra: number } | null = null
+  if (!hardWin) {
+    const sws = problemWindows(r, SOFT)
+    const sw = sws.find((w) => hour >= w.from && hour <= w.to) ?? sws.find((w) => w.from > hour && w.from - hour <= 1)
+    if (sw) {
+      const to = next && next.from <= sw.to ? next.from - 1 : sw.to
+      const hrs = Array.from({ length: to - sw.from + 1 }, (_, i) => sw.from + i)
+      const extra = Math.max(0, ...hrs.map((h) => softExtra(r, h)))
+      if (to >= sw.from && to >= hour && extra > 0) softWin = { from: sw.from, to, extra }
+    }
+  }
+  const planWin = hardWin ?? softWin
+  const peak = r.peak_hour
   const top = [...stops].sort((a, b) => b.weight - a.weight).slice(0, 5)
   return (
     <div className="ops-side sd">
       {head}
       <div className="sd-body" ref={body}>
+        {/* плитки и раскрытая подробность — одна карточка */}
+        <div className="facts-box" data-tab={tile ? { now: 0, pay: 1, peak: 2 }[tile] : undefined}>
         <div className="facts glyph-facts">
-          <Stat big icon={Users} v={fmt(r.boardings[hour])} tip={`Посадок в ${hh(hour)}`} />
-          <Stat big icon={Sigma} v={fmt(r.day_total)} tip="Посадок за сутки" />
-          <Stat big icon={TrendingUp} v={r.peak_hour != null ? hh(r.peak_hour) : '—'} tip="Час пик" />
+          <Stat big icon={Users} v={fmt(r.boardings[hour])} on={tile === 'now'} onClick={tap('now')} tip={`Посадок в ${hh(hour)} — нажмите, чтобы раскрыть`} />
+          <Stat big icon={Banknote} v={<LiveSum vals={r.boardings} timeRef={timeRef} />} on={tile === 'pay'} onClick={tap('pay')}
+            tip="Успешных оплат с 00:00 до времени на ленте (прогноз; одна успешная валидация = одна посадка) — нажмите, чтобы раскрыть" />
+          <Stat big icon={TrendingUp} v={peak != null ? hh(peak) : '—'} on={tile === 'peak'} onClick={tap('peak')} tip="Час пик — нажмите, чтобы раскрыть" />
+        </div>
+        {tile === 'now' && (
+          <Detail title={`Пассажиры в ${hh(hour)}–${hh((hour + 1) % 24)}`} rows={[
+            { k: 'Посадок за час', v: fmt(r.boardings[hour]) },
+            { k: 'Вагонов на линии', v: on ? Math.floor(r.vehicles[hour]) : '—' },
+            { k: 'На вагон', v: on ? `${fmt(r.boardings[hour] / Math.floor(r.vehicles[hour] || 1))} из ${fmt(r.norm)}` : '—' },
+            { k: 'Загрузка', v: on ? `${Math.round(r.ratio[hour] * 100)}%` : '—', color: on ? color : undefined },
+            ...(hour < 23 ? [{ k: `Следующий час, ${hh(hour + 1)}`, v: `${fmt(r.boardings[hour + 1])} (${r.boardings[hour] ? `${r.boardings[hour + 1] >= r.boardings[hour] ? '+' : ''}${Math.round((r.boardings[hour + 1] / r.boardings[hour] - 1) * 100)}%` : '—'})` }] : []),
+          ]} />
+        )}
+        {tile === 'pay' && <PayDetail vals={r.boardings} mix={r.pay_mix} cats={payCats} date={date} timeRef={timeRef} />}
+        {tile === 'peak' && peak != null && (
+          <Detail title={`Час пик ${hh(peak)}–${hh((peak + 1) % 24)}`} rows={[
+            { k: 'Посадок в пик', v: fmt(r.boardings[peak]) },
+            { k: 'Доля суток', v: `${Math.round(r.boardings[peak] / (r.day_total || 1) * 100)}%` },
+            { k: 'Вагонов в пик', v: r.vehicles[peak] > 0 ? Math.floor(r.vehicles[peak]) : '—' },
+            { k: 'Загрузка в пик', v: r.vehicles[peak] > 0 ? `${Math.round(r.ratio[peak] * 100)}%` : '—', color: r.vehicles[peak] > 0 ? LEVEL_COLORS[levelOf(r.ratio[peak])] : undefined },
+          ]} foot={peak !== hour && <button className="td-go" onClick={() => onHour(peak)}>К {hh(peak)}<ChevronRight size={14} /></button>} />
+        )}
         </div>
 
         <div className="hero" style={{ borderColor: `${color}66`, background: `${color}14` }}>
@@ -289,13 +400,13 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
               {on ? `${Math.round(r.ratio[hour] * 100)}%` : '—'}</b>
             <Stat icon={Clock} v={hh(hour)} tip="Выбранный час" />
           </div>
-          <FleetStrip vehicles={r.vehicles[hour]} ratio={r.ratio[hour]} extra={on ? r.extra[hour] : 0} />
+          <FleetStrip vehicles={r.vehicles[hour]} ratio={r.ratio[hour]} extra={on ? (cur ? r.extra[hour] : planWin?.extra ?? 0) : 0} />
           <div className="hero-row">
             {cur ? <span className={`wchip ${levelOf(cur.max)}`} title={`Перегрузка ${span(cur)}: нужно +${cur.extra} ваг.`}><TriangleAlert size={14} />{hspan(cur)}</span>
-              : next ? <span className={`wchip ${levelOf(next.max)}`} title={`Сейчас в норме. Перегрузка ожидается ${span(next)}, нужно +${next.extra} ваг.`}><TrendingUp size={14} />{hspan(next)}</span>
+              : next ? <span className={`wchip ${levelOf(next.max)}`} title={`Сейчас в норме. Перегрузка ожидается ${span(next)}, нужно +${next.extra} ваг.${next.from - hour > 1 ? ` Схема, откуда взять вагоны, появится в ${hh(next.from - 1)}.` : ''}`}><TrendingUp size={14} />{hspan(next)}</span>
                 : <span className="wchip ok" title="За день перегрузок не ожидается"><ShieldCheck size={14} />24 ч</span>}
-            <Fleet r={r} list={list} depots={depots} win={cur ?? next ?? null} />
           </div>
+          <Fleet r={r} list={list} depots={depots} win={planWin} hour={hour} soft={!hardWin && softWin != null} />
         </div>
 
         <div>

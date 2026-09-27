@@ -1,6 +1,6 @@
-import { BrainCircuit, ChevronDown, CircleHelp, Gauge, LayoutDashboard, Menu, Moon, Scale, Server, ShieldCheck, Table2, TrendingUp, TriangleAlert, Workflow, X } from 'lucide-react'
+import { BrainCircuit, CircleHelp, LayoutDashboard, Menu, Moon, Scale, Server, Table2, TrendingUp, TriangleAlert, Users, Workflow, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { DEFAULT_COEF, fmt, LEVEL_COLORS, levelOf, overLabel, useApi, type DayRoute, type DayView } from '../api'
+import { DEFAULT_COEF, fmt, useApi, type DayRoute, type DayView } from '../api'
 import { CoefPanel, useApp } from '../components'
 import OpsMap, { type MapMode } from './OpsMap'
 import Intro from './Intro'
@@ -18,7 +18,7 @@ export const MENU = [
 ]
 
 export default function OpsScreen({ drawer, openDrawer }: { drawer: string | null; openDrawer: (k: string | null) => void }) {
-  const { meta, geo, segments, allRoutes, schema, coef, setCoef, version } = useApp()
+  const { meta, geo, segments, schema, coef, setCoef, version } = useApp()
   // старт в режиме Live: сегодня и текущее время (если сегодня вне периода прогноза — Live сам выключится и вернёт демо-день)
   const [date, setDate] = useState(() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}` })
   const [minute, setMinute] = useState(() => { const t = new Date(); return t.getHours() * 60 + t.getMinutes() })
@@ -52,7 +52,6 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     tick()
     return () => cancelAnimationFrame(raf)
   }, [menu, showCoef])
-  const [probOpen, setProbOpen] = useState(false)
   // по умолчанию — схема маршрутов; сохранённый старый режим «схема по карте» тоже открывает схему
   const [mode, setModeState] = useState<MapMode>(() => { try { return localStorage.getItem('tf-map-mode') === 'map' ? 'map' : 'metro' } catch { return 'metro' } })
   const setMode = (m: MapMode) => { setModeState(m); try { localStorage.setItem('tf-map-mode', m) } catch { /* без хранилища — просто не запоминаем */ } }
@@ -81,15 +80,12 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
   }, [drawer, menu])
 
   const routes = useMemo(() => day.data?.routes ?? [], [day.data])
-  const problems = useMemo(() => routes.filter((r) => r.vehicles[hour] > 0 && r.ratio[hour] >= 1).sort((a, b) => b.ratio[hour] - a.ratio[hour]), [routes, hour])
   const sel = routes.find((r) => r.route === route)
   // порядок перелистывания веток в карточке — как на панели маршрутов внизу
   const routeList = useMemo(() => geo.map((g) => routes.find((r) => r.route === g.route)).filter((r): r is DayRoute => r != null), [geo, routes])
   const select = (r: number | null, s?: string | null) => { setRoute(r); setStop(s ?? null); if (r != null) setIntro(false) }
 
-  // бейджи проблемных веток в выбранный час — под шкалой времени
   const coefChanged = (Object.keys(DEFAULT_COEF) as (keyof typeof DEFAULT_COEF)[]).some((k) => coef[k] !== DEFAULT_COEF[k])
-  const crit = problems.filter((r) => r.ratio[hour] >= 1.2).length
 
   // состояние сети «сейчас»: даже ночью и без проблем оператор видит, что прогноз посчитан и всё под контролем
   const [calc, setCalc] = useState(true)
@@ -102,10 +98,11 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
   const calm = useMemo(() => {
     if (!routes.length) return null
     const running = routes.filter((r) => r.vehicles[hour] > 0)
-    // ближайший час впереди, когда какая-то ветка выйдет за норматив
+    // ближайший час впереди, когда за норматив выйдет ветка, которая сейчас в норме
+    const over = (r: DayRoute, h: number) => r.vehicles[h] > 0 && r.ratio[h] >= 1
     let next: { h: number; route: number } | null = null
     for (let h = hour + 1; h < 24 && !next; h++) {
-      const r = routes.filter((x) => x.vehicles[h] > 0 && x.ratio[h] >= 1).sort((a, b) => b.ratio[h] - a.ratio[h])[0]
+      const r = routes.filter((x) => over(x, h) && !over(x, hour)).sort((a, b) => b.ratio[h] - a.ratio[h])[0]
       if (r) next = { h, route: r.route }
     }
     let firstOut: number | null = null
@@ -113,52 +110,48 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     return {
       night: !running.length, firstOut, next,
       vehicles: Math.round(running.reduce((a, r) => a + r.vehicles[hour], 0)),
+      people: Math.round(running.reduce((a, r) => a + r.boardings[hour], 0)),
       load: Math.round(Math.max(0, ...running.map((r) => r.ratio[hour])) * 100),
     }
   }, [routes, hour])
   const hh = (h: number) => `${String(h).padStart(2, '0')}:00`
-  const routeColor = (n: number) => routes.find((x) => x.route === n)?.color ?? '#64748b'
-  const okChip = problems.length === 0 && calm && (
+  // цвет пассажиров по самой загруженной ветке: до 80% — зелёный, 80–100% плавно в оранжевый, выше 100% — красный
+  const peopleColor = (load: number) => {
+    if (load > 100) return '#f87171'
+    const t = Math.max(0, Math.min(1, (load - 80) / 20))
+    const mix = (a: number, b: number) => Math.round(a + (b - a) * t)
+    return `rgb(${mix(74, 251)}, ${mix(222, 146)}, ${mix(128, 60)})`
+  }
+  const stats = calm && (
     calc || day.loading
       ? <div className="okchip calc" title="Пересчёт прогноза по сети…"><i /></div>
       : calm.night
         ? <div className="okchip night" title={`Ночной перерыв: трамваи не выходят на линию${calm.firstOut != null ? `, выпуск с ${hh(calm.firstOut)}` : ''}${calm.next ? `; внимание в ${hh(calm.next.h)} (№${calm.next.route})` : '; перегрузок не ожидается'}`}>
             <Moon size={14} />{calm.firstOut != null && <><TramSide size={14} /><b>{hh(calm.firstOut)}</b></>}
-            {calm.next && <><TriangleAlert size={13} className="warn" /><span>{hh(calm.next.h)}</span><i className="rn" style={{ background: routeColor(calm.next.route) }}>{calm.next.route}</i></>}
+            {calm.next && <><TriangleAlert size={13} className="warn" /><span>{hh(calm.next.h)}</span></>}
           </div>
-        : <div className="okchip" title={`Все ветки в норме: ${calm.vehicles} ваг. на линии, максимум ${calm.load}% норматива${calm.next ? `; рост к ${hh(calm.next.h)} (№${calm.next.route})` : '; до конца суток без перегрузок'}`}>
-            <ShieldCheck size={14} /><TramSide size={14} /><b>{calm.vehicles}</b><Gauge size={13} /><span>{calm.load}%</span>
-            {calm.next && <><TrendingUp size={13} className="warn" /><span>{hh(calm.next.h)}</span><i className="rn" style={{ background: routeColor(calm.next.route) }}>{calm.next.route}</i></>}
+        : <div className="okrow">
+            <div className="okchip people" style={{ ['--pc' as string]: peopleColor(calm.load) }}
+              title={`Пассажиров за час по сети: ${fmt(calm.people)}. Самая загруженная ветка — ${calm.load}% норматива`}>
+              <Users size={15} /><b>{fmt(calm.people)}</b>
+            </div>
+            <div className="okchip" title={`Вагонов на линии: ${calm.vehicles}`}><TramSide size={15} /><b>{calm.vehicles}</b></div>
+            {calm.next && (
+              <div className="okchip next" title={`Следующий рост: к ${hh(calm.next.h)} за норматив выйдет №${calm.next.route}`}>
+                <TrendingUp size={15} /><b>{hh(calm.next.h)}</b>
+              </div>
+            )}
           </div>
   )
-  const badges = (problems.length > 0 || coefChanged || okChip) && (
-    <div className={`probwrap ${probOpen ? 'open' : ''}`}>
-    {okChip}
-    {/* на телефоне — одна плашка-сводка, по нажатию раскрывает все бейджи */}
-    {problems.length > 0 && (
-      <button className={`probsum ${crit ? 'crit' : ''}`} onClick={() => setProbOpen(!probOpen)} title={`Веток выше норматива: ${problems.length}`}>
-        <TriangleAlert size={14} /><b>{problems.length}</b>
-        <ChevronDown size={14} className="caret" />
-      </button>
-    )}
-    <div className="probbadges">
+  const badges = (coefChanged || stats) && (
+    <div className="probwrap">
+      {stats}
       {coefChanged && (
         <span className="coefchip" title="Прогноз скорректирован коэффициентами">
           <button onClick={() => setShowCoef(true)} title="Прогноз скорректирован коэффициентами — открыть"><Scale size={14} /></button>
           <button onClick={() => setCoef(DEFAULT_COEF)} title="Сбросить"><X size={13} /></button>
         </span>
       )}
-      {problems.map((r) => {
-        const lvl = levelOf(r.ratio[hour])
-        return (
-          <button key={r.route} className={`pbadge ${lvl} ${route === r.route ? 'on' : ''}`} onClick={() => { setProbOpen(false); select(route === r.route ? null : r.route) }}
-            title={`Трамвай №${r.route}: ${lvl === 'crit' ? 'перегрузка' : 'внимание'} — ${Math.round(r.ratio[hour] * 100)}% норматива, ${fmt(r.boardings[hour])} пос./ч на ${fmt(r.vehicles[hour])} ваг. — нужно +${r.extra[hour]} ваг.`}>
-            <span className="n" style={{ background: r.color }}>{r.route}</span>
-            <b style={{ color: LEVEL_COLORS[lvl] }}>{overLabel(r.ratio[hour])}</b>
-          </button>
-        )
-      })}
-    </div>
     </div>
   )
 
@@ -168,7 +161,7 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [geo, segments, schema, day.data, hour, route, stop, mode, drawer])
   const panelEl = useMemo(() => sel && (
-    <RoutePanel route={sel} geo={geo.find((g) => g.route === sel.route)} allGeo={geo} list={routeList} depots={day.data?.depots} date={date} hour={hour} stopId={stop} keys={!drawer && !menu && !showCoef}
+    <RoutePanel route={sel} geo={geo.find((g) => g.route === sel.route)} allGeo={geo} list={routeList} depots={day.data?.depots} date={date} hour={hour} stopId={stop} timeRef={timeRef} payCats={day.data?.pay_cats} keys={!drawer && !menu && !showCoef}
       onClose={() => select(null)} onHour={(h) => { setPlaying(false); setLive(false); setMinute(h * 60) }} onStop={(s) => setStop(s)}
       onRoute={(r, s) => select(r, s)} />
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,7 +187,7 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
 
       {intro && !sel && <Intro onClose={() => setIntro(false)} />}
 
-      <RouteBar geo={geo} allRoutes={allRoutes} routes={routes} hour={hour} selected={route} onSelect={(r) => select(r)} />
+      <RouteBar geo={geo} routes={routes} hour={hour} selected={route} onSelect={(r) => select(r)} />
 
       {menu && (
         <>
