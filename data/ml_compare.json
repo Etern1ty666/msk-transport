@@ -12,30 +12,30 @@
    "title": "2 недели: вторая половина октября",
    "train_rows": 506880,
    "profile": 0.9168,
-   "lgb_corr": 0.9124,
-   "lgb_direct": 0.9113,
-   "mlp": 0.8685,
+   "lgb_corr": 0.9126,
+   "lgb_direct": 0.9123,
+   "mlp": 0.876,
    "ens": 0.9168
   },
   {
    "set": "5 окон",
    "title": "1 месяц: октябрь",
    "train_rows": 468240,
-   "profile": 0.9031,
-   "lgb_corr": 0.8913,
-   "lgb_direct": 0.8871,
-   "mlp": 0.8666,
-   "ens": 0.9013
+   "profile": 0.9032,
+   "lgb_corr": 0.8919,
+   "lgb_direct": 0.8889,
+   "mlp": 0.8676,
+   "ens": 0.9014
   },
   {
    "set": "5 окон",
    "title": "1,5 месяца: сер. сентября – октябрь",
    "train_rows": 430800,
    "profile": 0.8888,
-   "lgb_corr": 0.8506,
-   "lgb_direct": 0.8504,
-   "mlp": 0.8292,
-   "ens": 0.882
+   "lgb_corr": 0.8595,
+   "lgb_direct": 0.8532,
+   "mlp": 0.8278,
+   "ens": 0.8837
   },
   {
    "set": "5 окон",
@@ -131,79 +131,79 @@
    "set": "скользящие",
    "title": "скользящее 18.07 + 56 дн",
    "train_rows": 309360,
-   "profile": 0.8417,
-   "lgb_corr": 0.8518,
-   "lgb_direct": 0.8634,
-   "mlp": 0.8289,
-   "ens": 0.8477
+   "profile": 0.8354,
+   "lgb_corr": 0.8499,
+   "lgb_direct": 0.8579,
+   "mlp": 0.8225,
+   "ens": 0.8429
   },
   {
    "set": "скользящие",
    "title": "скользящее 01.08 + 56 дн",
    "train_rows": 338640,
-   "profile": 0.7898,
-   "lgb_corr": 0.8031,
-   "lgb_direct": 0.8228,
-   "mlp": 0.7938,
-   "ens": 0.7959
+   "profile": 0.8058,
+   "lgb_corr": 0.8059,
+   "lgb_direct": 0.8247,
+   "mlp": 0.8059,
+   "ens": 0.8084
   },
   {
    "set": "скользящие",
    "title": "скользящее 15.08 + 56 дн",
    "train_rows": 367920,
-   "profile": 0.7922,
-   "lgb_corr": 0.7844,
-   "lgb_direct": 0.7964,
-   "mlp": 0.782,
-   "ens": 0.7913
+   "profile": 0.7959,
+   "lgb_corr": 0.7812,
+   "lgb_direct": 0.8058,
+   "mlp": 0.7785,
+   "ens": 0.7931
   },
   {
    "set": "скользящие",
    "title": "скользящее 29.08 + 56 дн",
    "train_rows": 397200,
-   "profile": 0.8238,
-   "lgb_corr": 0.7883,
-   "lgb_direct": 0.7883,
-   "mlp": 0.7747,
-   "ens": 0.8149
+   "profile": 0.8224,
+   "lgb_corr": 0.7961,
+   "lgb_direct": 0.798,
+   "mlp": 0.7562,
+   "ens": 0.8156
   },
   {
    "set": "скользящие",
    "title": "скользящее 12.09 + 56 дн",
    "train_rows": 426480,
    "profile": 0.8855,
-   "lgb_corr": 0.846,
-   "lgb_direct": 0.8392,
-   "mlp": 0.8029,
-   "ens": 0.8778
+   "lgb_corr": 0.8557,
+   "lgb_direct": 0.8433,
+   "mlp": 0.8282,
+   "ens": 0.8798
   },
   {
    "set": "скользящие",
    "title": "скользящее 26.09 + 56 дн",
    "train_rows": 458640,
    "profile": 0.8922,
-   "lgb_corr": 0.8766,
-   "lgb_direct": 0.8735,
-   "mlp": 0.82,
-   "ens": 0.8892
+   "lgb_corr": 0.881,
+   "lgb_direct": 0.8762,
+   "mlp": 0.847,
+   "ens": 0.8903
   }
  ],
  "mean": {
   "5 окон": {
    "profile": 0.8872,
-   "lgb_corr": 0.8731,
-   "lgb_direct": 0.868,
-   "mlp": 0.7519,
-   "ens": 0.8851
+   "lgb_corr": 0.8751,
+   "lgb_direct": 0.8692,
+   "mlp": 0.7533,
+   "ens": 0.8855
   },
   "скользящие": {
-   "profile": 0.8406,
-   "lgb_corr": 0.8258,
-   "lgb_direct": 0.8238,
-   "mlp": 0.6873,
-   "ens": 0.8404
+   "profile": 0.8415,
+   "lgb_corr": 0.8273,
+   "lgb_direct": 0.8255,
+   "mlp": 0.6901,
+   "ens": 0.8414
   }
  },
- "seconds": 294,
+ "seconds": 251,
  "winner": "profile"
 }

@@ -1,4 +1,4 @@
-"""TramFlow API: прогноз загрузки трамвайных маршрутов Москвы.
+"""ПОТОК (СПП) API — система прогнозирования пассажиропотока трамвайных маршрутов Москвы.
 
 REST:  /api/*          — прогнозы, история, карта, модель, экспорт, конвейер, метрики
 WS:    /ws/pipeline    — ход конвейера (стадии, прогресс, логи) в реальном времени
@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="TramFlow — ИИ-прогноз загрузки трамваев", version="1.0.0", lifespan=lifespan,
+app = FastAPI(title="ПОТОК (СПП) — Система прогнозирования пассажиропотока", version="1.0.0", lifespan=lifespan,
               default_response_class=FastJSON)
 app.add_middleware(GZipMiddleware, minimum_size=2048)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

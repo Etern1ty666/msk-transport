@@ -873,15 +873,7 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .page .card table.t { min-width: 100%; }
 .page .card h3 { flex-wrap: wrap; }
 
-/* ---- приветствие «о проекте»: по центру, затемнённый фон ---- */
-.intro-back { position: fixed; inset: 0; z-index: 55; background: rgba(2,6,14,.5); backdrop-filter: blur(2px); animation: fadein .2s; }
-.intro { position: fixed; z-index: 56; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 24px);
-  overflow: auto; padding: 24px 24px 20px; display: grid; gap: 18px; border-radius: 18px; background: #111a2e; border: 1px solid var(--hair);
-  box-shadow: 0 30px 80px rgba(0,0,0,.55); animation: introIn .28s cubic-bezier(.2,.8,.2,1); }
-@keyframes introIn { from { opacity: 0; transform: translate(-50%, calc(-50% + 12px)) scale(.98); } }
-.intro-x { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; }
-.intro h2 { margin: 0 0 -12px; font-size: 20px; line-height: 1.25; letter-spacing: -.2px; padding-right: 36px; }
-.intro > .note { font-size: 13px; }
+/* ---- плашка точности модели («О проекте») ---- */
 .intro-score { background: var(--surface); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; }
 .is-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
 .is-row b { font-size: 30px; color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: -.5px; line-height: 1; }
@@ -889,22 +881,6 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .is-bar i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
 .is-bar em { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #e2e8f0; border-radius: 1px; }
 .is-foot { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); }
-.intro-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.intro-steps li { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: center; font-size: 13.5px; line-height: 1.4; }
-.intro-steps li svg { width: 34px; height: 34px; padding: 8px; border-radius: 10px; background: var(--surface-2); color: var(--text); }
-.intro-steps b { font-weight: 600; }
-.intro-steps .c-crit { color: #f87171; }
-.intro-steps .c-ok { color: #4ade80; }
-/* шкала наполненности вагона — те же цвета, что у свечения на схеме (fillRGB) */
-.intro-steps .fill-swatch { width: 34px; height: 34px; border-radius: 10px;
-  background: linear-gradient(135deg, rgb(74,222,128) 0%, rgb(34,197,94) 30%, rgb(21,128,61) 60%, rgb(21,128,61) 65%, rgb(245,140,20) 80%, rgb(239,90,30) 90%, rgb(220,38,38) 100%); }
-.intro-steps .c-high { color: #fb923c; }
-.intro-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.intro-actions .ia { justify-content: center; height: 40px; font-size: 14px; }
-@media (max-width: 720px) {
-  .intro { top: auto; bottom: 0; left: 0; right: 0; width: auto; transform: none; border-radius: 18px 18px 0 0; max-height: 92vh;
-    padding-bottom: calc(20px + env(safe-area-inset-bottom)); animation: sheetUp .35s cubic-bezier(.2,.8,.2,1); }
-}
 .ia { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: var(--surface-2); color: var(--text);
   font-size: 13px; cursor: pointer; text-decoration: none; white-space: nowrap; }
 .ia:hover { background: rgba(148,163,184,.22); text-decoration: none; }

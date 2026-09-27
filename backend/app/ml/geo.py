@@ -41,7 +41,7 @@ def fetch_osm() -> dict:
     if OSM_CACHE.exists():
         return json.loads(OSM_CACHE.read_text())
     r = httpx.post(OVERPASS, data={"data": OVERPASS_QUERY}, timeout=180,
-                   headers={"User-Agent": "tramflow-hackathon/1.0"})
+                   headers={"User-Agent": "potok-spp-hackathon/1.0"})
     r.raise_for_status()
     OSM_CACHE.write_text(r.text)
     return r.json()

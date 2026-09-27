@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_COEF, freeWindow, OFFLINE, overLabel, TH, useDay, type DayRoute } from '../api'
 import { useApp } from '../components'
 import OpsMap, { type MapMode } from './OpsMap'
-import Intro from './Intro'
 import RouteBar from './RouteBar'
 import RoutePanel from './RoutePanel'
 import Timeline, { useLiveWeather } from './Timeline'
@@ -37,10 +36,6 @@ export default function OpsScreen({ drawer, openDrawer, sidePage, sideWide }: {
     <button className={cls} onClick={openMenu} title="Меню"><Menu size={cls.includes('tl-menu') ? 17 : 22} /></button>
   )
   const [live, setLive] = useState(true) // по умолчанию — реальное время
-  const introRef = useRef(false)
-  const [intro, setIntroState] = useState(() => { try { return !localStorage.getItem('tf-intro-seen') } catch { return true } })
-  introRef.current = intro
-  const setIntro = (v: boolean) => { setIntroState(v); if (!v) try { localStorage.setItem('tf-intro-seen', '1') } catch { /* без хранилища */ } }
   // пока меню или коэффициенты открыты — держим их под кнопкой, даже если шкала сдвигается
   useEffect(() => {
     if (!menu) return
@@ -90,7 +85,7 @@ export default function OpsScreen({ drawer, openDrawer, sidePage, sideWide }: {
       const tag = (e.target as HTMLElement).tagName
       if (drawer || tag === 'INPUT' || tag === 'SELECT') return
       if (e.key === ' ') { e.preventDefault(); setPlaying((p) => !p) }
-      else if (e.key === 'Escape') { if (menu) setMenu(false); else if (introRef.current) setIntro(false); else if (stopRef.current) setStop(null); else setRoute(null) }
+      else if (e.key === 'Escape') { if (menu) setMenu(false); else if (stopRef.current) setStop(null); else setRoute(null) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -100,7 +95,7 @@ export default function OpsScreen({ drawer, openDrawer, sidePage, sideWide }: {
   const sel = routes.find((r) => r.route === route)
   // порядок перелистывания веток в карточке — как на панели маршрутов внизу
   const routeList = useMemo(() => geo.map((g) => routes.find((r) => r.route === g.route)).filter((r): r is DayRoute => r != null), [geo, routes])
-  const select = (r: number | null, s?: string | null) => { setRoute(r); setStop(s ?? null); if (r != null) { setIntro(false); if (sidePage) openDrawer(null) } }
+  const select = (r: number | null, s?: string | null) => { setRoute(r); setStop(s ?? null); if (r != null && sidePage) openDrawer(null) }
   const routeNav = useRef<(d: -1 | 1) => void>(() => {})
   routeNav.current = (d) => {
     const ids = routeList.map((x) => x.route)
@@ -240,7 +235,6 @@ export default function OpsScreen({ drawer, openDrawer, sidePage, sideWide }: {
 
       {sidePage ?? panelEl}
 
-      {intro && !sel && <Intro onClose={() => setIntro(false)} />}
 
       <RouteBar focused={routeKeys} geo={geo} selected={route} onSelect={(r) => select(r)} />
 
@@ -248,7 +242,7 @@ export default function OpsScreen({ drawer, openDrawer, sidePage, sideWide }: {
         <>
           <div className="menu-back" onClick={() => setMenu(false)} />
           <nav className="menupop glass" style={menuAt}>
-            <div className="mp-head"><b>TramFlow</b><span className="note">ИИ-прогноз загрузки трамваев</span>
+            <div className="mp-head"><b>ПОТОК</b><span className="note">Система прогнозирования пассажиропотока · СПП</span>
               <button className="iconbtn" onClick={() => setMenu(false)} title="Закрыть"><X size={18} /></button></div>
             {MENU.map((m) => (
               <button key={m.key} onClick={() => { setMenu(false); openDrawer(m.key) }}>
