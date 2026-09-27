@@ -1,5 +1,5 @@
 import type { ExpressionSpecification, GeoJSONSource, Map as MLMap, MapLayerMouseEvent } from 'maplibre-gl'
-import { Map as MapIcon, Minus, Plus, Route } from 'lucide-react'
+import { Map as MapIcon, Minus, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 type ML = typeof import('maplibre-gl')
 import SchemeView, { type SchemeApi } from './scheme/SchemeView'
@@ -388,10 +388,10 @@ export default function OpsMap({ geo, segments, schema, day, hour, selected, sel
       {toast && <div className="float glass sch-toast">{toast}</div>}
       <div className="float mapctl">
         {help}
-        {/* иконка и подсказка — то, на что переключит кнопка */}
-        <button className="mapbtn glass" onClick={() => { const nx = MODE_NEXT[mode]; onMode(nx); setToast(MODE_TITLE[nx]) }}
-          title={mode === 'map' ? 'Показать схему' : 'Показать карту'} aria-label={mode === 'map' ? 'Показать схему' : 'Показать карту'}>
-          {mode === 'map' ? <Route size={20} strokeWidth={1.75} /> : <MapIcon size={20} strokeWidth={1.75} />}
+        {/* переключатель «карта»: одна иконка; нажат (подсвечен) — подложка-карта, отжат — схема */}
+        <button className={`mapbtn glass ${mode === 'map' ? 'on' : ''}`} onClick={() => { const nx = MODE_NEXT[mode]; onMode(nx); setToast(MODE_TITLE[nx]) }}
+          title={mode === 'map' ? 'Карта включена — выключить (схема)' : 'Включить карту'} aria-label="Карта" aria-pressed={mode === 'map'}>
+          <MapIcon size={20} strokeWidth={1.75} />
         </button>
         <div className="zoomctl glass">
           <button onClick={() => zoom(1)} title="Приблизить"><Plus size={20} strokeWidth={1.75} /></button>

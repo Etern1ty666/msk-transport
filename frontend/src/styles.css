@@ -1596,3 +1596,38 @@ table.t tr.best td { color: var(--accent); font-weight: 600; }
 .fp-tabbox .fp-tabs { align-items: stretch; }
 .fp-tabbox .fp-tabs button:not(.on) { margin-bottom: 8px; }
 .fp-tabbox .fp-tabs button:not(.on):hover { background: var(--surface, rgba(148,163,184,.08)); box-shadow: none; }
+.tdet.plain .td-r + .td-r { border-top: 0; }
+/* стрелки ← → сейчас у ленты времени (хотя открыта остановка) — лента подсвечена */
+.ops-time.kfocus .ops-time-in { box-shadow: 0 0 0 1.5px rgba(34,211,238,.55), 0 10px 30px rgba(0,0,0,.35); }
+/* стрелки ← → сейчас листают маршруты — нижняя панель подсвечена */
+.routebar.kfocus { box-shadow: 0 0 0 1.5px rgba(34,211,238,.55), 0 10px 30px rgba(0,0,0,.35); }
+/* переключатель «карта»: нажат — подсвечен */
+.mapctl .mapbtn.on { color: var(--accent); background: rgba(34,211,238,.16); box-shadow: inset 0 0 0 1.5px rgba(34,211,238,.55); }
+.mapctl .mapbtn.glass.on { background: #0e3340; color: #67e8f9; box-shadow: inset 0 0 0 1.5px rgba(34,211,238,.7), 0 6px 18px rgba(0,0,0,.3); }
+/* раздел «Станции» в карточке ветки */
+.stlist { display: grid; gap: 8px; }
+.st-head { display: flex; align-items: center; gap: 8px; }
+.ops-side .st-head h4 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+.st-sort { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border: 0; border-radius: 8px;
+  background: none; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.st-sort:hover { color: var(--text); background: var(--surface, rgba(148,163,184,.08)); }
+.st-sort.on { color: var(--accent); }
+.st-search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 10px; background: var(--surface, rgba(148,163,184,.08));
+  color: var(--muted); cursor: text; }
+.st-search:focus-within { box-shadow: inset 0 0 0 1.5px rgba(34,211,238,.5); }
+.st-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font-size: 13.5px; }
+.st-search input::placeholder { color: var(--muted); }
+.st-search button { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.st-search button:hover { color: var(--text); }
+.stlist .toprow { background: none; }
+.stlist .toprow:hover { background: var(--surface, rgba(148,163,184,.08)); }
+.stlist .toprow .num { display: inline-flex; align-items: center; gap: 4px; }
+.st-empty { padding: 8px 10px; font-size: 13px; color: var(--muted); }
+/* под лентой остановок больше нет подписи выбранной — лента ниже */
+.sd-strip.focus { height: 128px; }
+/* депо во вкладках вариантов — плашкой с подложкой, как в строках схемы и как номера веток */
+.fp-tplaces .fp-tchip.depot { height: 22px; padding: 0 7px; border-radius: 6px; background: rgba(148,163,184,.16); color: #e2e8f0;
+  font-size: 12.5px; font-weight: 700; }
+/* заголовок раздела «Пересадки» — как «Станции» */
+.ops-side h4.sec-title { font-size: 14px; font-weight: 700; color: var(--text); gap: 8px; }
+.ops-side h4.sec-title svg { color: var(--muted); }

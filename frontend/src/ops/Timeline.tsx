@@ -12,6 +12,7 @@ type Props = {
   date: string; setDate: (d: string) => void; minute: number; setMinute: (m: number) => void
   playing: boolean; setPlaying: (p: boolean) => void; speed: number; setSpeed: (s: number) => void
   day: DayView | null; min: string; max: string; below?: ReactNode; keys?: boolean
+  focused?: boolean // стрелки сейчас у ленты времени, хотя открыта остановка — подсвечиваем
   live: boolean; setLive: (v: boolean) => void
   lead?: ReactNode // кнопка меню — первой в строке управления
 }
@@ -339,7 +340,7 @@ function Ruler({ date, day, days, minute, span, live, onMove, onZoom, onJump, on
   )
 }
 
-export default function Timeline({ date, setDate, minute, setMinute, playing, setPlaying, speed, setSpeed, day, min, max, below, keys = true, live, setLive, lead }: Props) {
+export default function Timeline({ date, setDate, minute, setMinute, playing, setPlaying, speed, setSpeed, day, min, max, below, keys = true, focused, live, setLive, lead }: Props) {
   const [span, setSpan] = useState(420)
   const st = useRef({ date, minute })
   st.current.date = date
@@ -453,7 +454,7 @@ export default function Timeline({ date, setDate, minute, setMinute, playing, se
   const secs = live ? `:${String(Math.floor((minute % 1) * 60 + 1e-6)).padStart(2, '0')}` : ''
 
   return (
-    <div className="float ops-time">
+    <div className={`float ops-time ${focused ? 'kfocus' : ''}`}>
       <div className="glass ops-time-in">
         <div className="row1">
           {lead}

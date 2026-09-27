@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, ArrowLeftRight, Banknote, ChartPie, ChevronRight, Clock, EllipsisVertical, FileSpreadsheet, Info, ListOrdered, ShieldCheck, TrendingUp, TriangleAlert, Users, X } from 'lucide-react'
+import { ArrowLeft, ArrowDownWideNarrow, ArrowLeftRight, Banknote, ChevronRight, Clock, EllipsisVertical, FileSpreadsheet, ListOrdered, Search, ShieldCheck, TrendingUp, TriangleAlert, User, Users, X } from 'lucide-react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { exportUrl, fmt, LEVEL_COLORS, LEVEL_TITLE, levelOf, problemWindows, SOFT, softExtra, freeWindow, type DayRoute, type Depot, type RouteGeo, type Stop } from '../api'
 import { axis, tooltipStyle, useApp } from '../components'
@@ -13,6 +13,7 @@ type Props = {
   timeRef: RefObject<number> // минута ленты времени: оплаты с 00:00 растут вместе с ползунком
   payCats?: { key: string; title: string }[] | null
   keys: boolean // ↑/↓ листают, пока поверх карты ничего не открыто
+  lr?: boolean // ← → тоже листают остановки (фокус на остановках, а не на ленте времени)
   onClose: () => void; onHour: (h: number) => void; onStop: (id: string | null) => void
   onRoute: (route: number, stopId: string | null) => void
 }
@@ -23,7 +24,7 @@ const span = (w: { from: number; to: number }) => `${hh(w.from)}–${String(w.to
 const dist = (a: Stop, b: Stop) => Math.hypot((a.lon - b.lon) * 62_600, (a.lat - b.lat) * 111_200)
 // в данных кавычки вперемешку: «Метро "ВДНХ"» и «Метро «ВДНХ»» — показываем единообразно ёлочками
 const nice = (s: string) => s.replace(/"([^"]*)"/g, '«$1»')
-const meters = (m: number) => (m < 60 ? 'здесь' : `≈${Math.round(m / 10) * 10} м`)
+const meters = (m: number) => (m < 60 ? 'здесь' : `${Math.round(m / 10) * 10} м`)
 
 // остановка у метро / МЦК / МЦД: «Метро «ВДНХ»» → { kind: 'М', name: 'ВДНХ' }
 const RAIL = /^(Метро|МЦК|МЦД)\s+[«"]?([^»"]+)[»"]?\s*$/
@@ -72,17 +73,18 @@ const cumAt = (vals: number[], minute: number) => {
   for (let i = 0; i < h; i++) s += vals[i]
   return h < 24 ? s + vals[h] * (m % 60) / 60 : s
 }
-function LiveSum({ vals, timeRef, approx }: { vals: number[]; timeRef: RefObject<number>; approx?: boolean }) {
+function LiveSum({ vals, timeRef }: { vals: number[]; timeRef: RefObject<number> }) {
   const m = useMinute(timeRef)
-  return <>{approx ? '≈' : ''}{fmt(Math.round(cumAt(vals, m)))}</>
+  return <>{fmt(Math.round(cumAt(vals, m)))}</>
 }
 
 /** Раскрытая плитка: строка на всю ширину под плитками — заголовок и «название — значение». */
-function Detail({ title, sub, lead, rows, foot }: {
+function Detail({ title, sub, lead, rows, foot, plain }: {
+  plain?: boolean // без разделителей между строками
   title?: ReactNode; sub?: ReactNode; lead?: ReactNode; rows: { k: string; v: ReactNode; share?: number; color?: string }[]; foot?: ReactNode
 }) {
   return (
-    <div className="tdet">
+    <div className={`tdet ${plain ? 'plain' : ''}`}>
       {title != null && <div className="td-h"><b>{title}</b>{sub && <span>{sub}</span>}</div>}
       {lead}
       {rows.map((r) => (
@@ -113,9 +115,7 @@ function PayDetail({ vals, mix, cats, date, timeRef, where }: {
     cats.forEach((c, k) => rows.push({ k: c.title, v: fmt(n[k]), share: total ? n[k] / total : 0 }))
   }
   rows.push({ k: 'Всего', v: fmt(total) })
-  return <Detail title={`Успешные оплаты${where ? ` ${where}` : ''} за ${ddmm(date)}`} sub={`00:00–${hm(m)}`} rows={rows}
-    foot={<p className="td-note" title="Наличных в трамвае нет: оплата картой «Тройка», банковской картой, проездным, льготной картой или билетом. Доли — по валидациям последних 4 недель этого маршрута в этот час">
-      <Info size={12} />наличных в валидациях нет — только карты и билеты</p>} />
+  return <Detail plain title={`Успешные оплаты${where ? ` ${where}` : ''} за ${ddmm(date)}`} sub={`00:00–${hm(m)}`} rows={rows} />
 }
 
 const GAP = 54 // шаг между остановками на ленте, px — диагональные подписи в 2–3 строки не наезжают
@@ -158,7 +158,6 @@ function StopStrip({ stops, color, sel, onPick }: { stops: Stop[]; color: string
     return () => el.removeEventListener('wheel', wheel)
   }, [sel, n])
 
-  const cur = railOf(stops[sel].name)
   return (
     <div ref={box} className={`sd-strip focus ${moreL ? 'more-l' : ''} ${moreR ? 'more-r' : ''} ${d.current && drag ? 'dragging' : ''}`}
       onPointerDown={(e) => { e.preventDefault(); (e.target as Element).setPointerCapture?.(e.pointerId); d.current = { x: e.clientX, moved: 0 } }}
@@ -179,10 +178,6 @@ function StopStrip({ stops, color, sel, onPick }: { stops: Stop[]; color: string
         if (i !== sel) onPick(i)
       }}
       onPointerCancel={() => { d.current = null; setDrag(0) }}>
-      {/* выбранная станция — горизонтально под точкой */}
-      <div className="sd-cur">
-        <b key={sel}>{cur && <em className={cur.kind === 'М' ? 'm' : 'd'}>{cur.kind}</em>}{nice(stops[sel].name)}</b>
-      </div>
       {w > 0 && n > 0 && <>
         {/* пройденная часть линии — в цвет ветки, впереди — приглушённая */}
         <i className="sd-line rest" style={{ left: x(0), width: x(n - 1) - x(0) }} />
@@ -202,9 +197,12 @@ function StopStrip({ stops, color, sel, onPick }: { stops: Stop[]; color: string
   )
 }
 
-export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, hour, stopId, timeRef, payCats, keys, onClose, onHour, onStop, onRoute }: Props) {
+export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, hour, stopId, timeRef, payCats, keys, lr = false, onClose, onHour, onStop, onRoute }: Props) {
   const [tile, setTile] = useState<'now' | 'pay' | 'veh' | null>(null)
   const tap = (k: 'now' | 'pay' | 'veh') => () => setTile((t) => (t === k ? null : k))
+  // раздел «Станции» в карточке ветки: поиск и сортировка по пассажирам
+  const [q, setQ] = useState('')
+  const [byLoad, setByLoad] = useState(false)
   // меню «⋮» в шапке: закрывается кликом мимо, Esc (раньше, чем Esc закроет саму карточку) и при смене ветки / остановки
   const [more, setMore] = useState(false)
   useEffect(() => { setMore(false) }, [r.route, stopId])
@@ -237,18 +235,21 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
   }
   const goRef = useRef(go)
   goRef.current = go
-  // ↑ / ↓ — предыдущая / следующая (← → заняты лентой времени)
+  // ↑ / ↓ — предыдущая / следующая; ← → — тоже, когда фокус на остановках (иначе ← → листают ленту времени)
   useEffect(() => {
     if (!keys) return
     const k = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return
+      const back = e.key === 'ArrowUp' || (lr && e.key === 'ArrowLeft')
+      const fwd = e.key === 'ArrowDown' || (lr && e.key === 'ArrowRight')
+      if (!back && !fwd) return
       e.preventDefault()
-      goRef.current(e.key === 'ArrowUp' ? -1 : 1)
+      goRef.current(back ? -1 : 1)
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
-  }, [keys])
+  }, [keys, lr])
 
   // на другой ветке или при переходе ветка ↔ остановка — тело карточки с начала; при листании остановок остаётся на месте
   const body = useRef<HTMLDivElement>(null)
@@ -265,9 +266,11 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
       <div className="sd-bar">
         <button className="sd-close" onClick={() => (stop ? onStop(null) : onClose())} title={stop ? `К ветке №${r.route} (Esc)` : 'Закрыть (Esc)'}
           aria-label={stop ? `К ветке №${r.route}` : 'Закрыть'}>{stop ? <ArrowLeft size={20} /> : <X size={20} />}</button>
-        <span className="sd-id" title={`Трамвай №${r.route}: ${terminals}`}>
+        <span className="sd-id" title={stop ? `${nice(stop.name)} — трамвай №${r.route}: ${terminals}` : `Трамвай №${r.route}: ${terminals}`}>
           <span className="rnum lg" style={{ background: r.color }}>{r.route}</span>
-          <span className="sd-name"><span className="t">{nice(termA)}{termB && '\u00a0—'}</span>{termB && <> <span className="t">{nice(termB)}</span></>}</span>
+          {stop
+            ? <span className="sd-name"><span className="t">Остановка «{nice(stop.name)}»</span></span>
+            : <span className="sd-name"><span className="t">{nice(termA)}{termB && '\u00a0—'}</span>{termB && <> <span className="t">{nice(termB)}</span></>}</span>}
         </span>
         <div className="sd-more">
           <button className={`sd-close ${more ? 'on' : ''}`} onClick={() => setMore(!more)} title="Ещё" aria-label="Ещё" aria-haspopup="menu" aria-expanded={more}>
@@ -311,37 +314,48 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
       <div className={`ops-side sd ${scrolled ? 'scrolled' : ''}`}>
         {head}
         <div className="sd-body" ref={body} onScroll={onBodyScroll}>
-          <div className="facts-box" data-tab={tile === 'pay' ? 0 : undefined}>
+          {/* три главных параметра остановки — каждый раскрывается, как в карточке ветки */}
+          <div className="facts-box" data-tab={tile ? { now: 0, pay: 1, veh: 2 }[tile] : undefined}>
           <div className="facts glyph-facts">
-            <Stat big icon={Banknote} v={<LiveSum vals={vals} timeRef={timeRef} approx />} on={tile === 'pay'} onClick={tap('pay')}
+            <Stat big icon={Users} v={fmt(vals[hour])} on={tile === 'now'} onClick={tap('now')}
+              tip={`${fmt(vals[hour])} посадок на остановке в ${hh(hour)} — нажмите, чтобы раскрыть`} />
+            <Stat big icon={Banknote} v={<LiveSum vals={vals} timeRef={timeRef} />} on={tile === 'pay'} onClick={tap('pay')}
               tip="Успешных оплат на остановке с 00:00 до времени на ленте (прогноз; одна успешная валидация = одна посадка) — нажмите, чтобы раскрыть" />
-            <Stat big icon={TrendingUp} v={hh(peak)} tip={`Пик на остановке: ≈${fmt(vals[peak])} посадок в час`} />
-            <Stat big icon={ListOrdered} v={`${rank}/${stops.length}`} tip={`${rank}-я из ${stops.length} остановок по посадкам`} />
+            <Stat big icon={TrendingUp} v={hh(peak)} on={tile === 'veh'} onClick={tap('veh')}
+              tip={`Час пик на остановке: ${fmt(vals[peak])} посадок — нажмите, чтобы раскрыть`} />
           </div>
+          {tile === 'now' && (
+            <Detail title={`Пассажиры в ${hh(hour)}–${hh((hour + 1) % 24)}`} rows={[
+              { k: 'Посадок на остановке', v: fmt(vals[hour]) },
+              { k: 'Доля в потоке маршрута', v: `${(stop.weight * 100).toFixed(1)}%` },
+              { k: 'Место по посадкам', v: `${rank} из ${stops.length}` },
+              { k: 'За сутки', v: fmt(r.day_total * stop.weight) },
+              ...(hour < 23 ? [{ k: `Следующий час, ${hh(hour + 1)}`, v: `${fmt(vals[hour + 1])}${vals[hour] ? ` (${vals[hour + 1] >= vals[hour] ? '+' : ''}${Math.round((vals[hour + 1] / vals[hour] - 1) * 100)}%)` : ''}` }] : []),
+            ]} />
+          )}
           {tile === 'pay' && <PayDetail vals={vals} mix={r.pay_mix} cats={payCats} date={date} timeRef={timeRef} where="на остановке" />}
-          </div>
-
-          <div className="hero" style={{ borderColor: `${color}66`, background: `${color}14` }}>
-            <div className="big">
-              <span className="bigv" title={`≈${fmt(vals[hour])} посадок на остановке в ${span({ from: hour, to: hour })}`}><Users size={22} /><b>≈{fmt(vals[hour])}</b></span>
-              <Stat icon={Clock} v={hh(hour)} tip="Выбранный час" />
-              <span className="hero-info" title="Оценка: поток маршрута × доля остановки (по OpenStreetMap; пересадочные узлы и конечные весят больше)"><Info size={15} /></span>
-            </div>
-            <div className="glyphs">
-              <Stat icon={ChartPie} v={`${(stop.weight * 100).toFixed(1)}%`} tip="Доля остановки в потоке маршрута" />
-              {on
-                ? <span className="stat" title={`Вагоны №${r.route} в ${hh(hour)}: ${Math.round(r.ratio[hour] * 100)}% норматива — ${LEVEL_TITLE[lvl]}`}>
-                    <TramSide size={14} /><b style={{ color }}>{Math.round(r.ratio[hour] * 100)}%</b></span>
-                : <span className="stat off" title="Маршрут в этот час не работает"><TramSide size={14} /><b>—</b></span>}
-            </div>
-            <FleetStrip vehicles={r.vehicles[hour]} ratio={r.ratio[hour]} extra={0} />
+          {tile === 'veh' && (() => {
+            // утренний и вечерний пик на остановке, самые загруженные часы
+            const pk = (from: number, to: number) => { let b = from; for (let h = from; h < to; h++) if (vals[h] > vals[b]) b = h; return b }
+            const am = pk(5, 12), pm = pk(12, 24)
+            const top = vals.map((v, h) => [v, h]).sort((a, b) => b[0] - a[0]).slice(0, 3).map(([, h]) => hh(h)).join(', ')
+            return (
+              <Detail title={`Час пик ${hh(peak)}–${hh((peak + 1) % 24)}`} rows={[
+                { k: 'Посадок в пик', v: fmt(vals[peak]) },
+                { k: 'Доля суток', v: `${Math.round(vals[peak] / (vals.reduce((a, b) => a + b, 0) || 1) * 100)}%` },
+                { k: 'Утренний пик', v: `${hh(am)} · ${fmt(vals[am])}` },
+                { k: 'Вечерний пик', v: `${hh(pm)} · ${fmt(vals[pm])}` },
+                { k: 'Самые загруженные часы', v: top },
+              ]} foot={peak !== hour && <button className="td-go" onClick={() => onHour(peak)}>К {hh(peak)}<ChevronRight size={14} /></button>} />
+            )
+          })()}
           </div>
 
           <DayBars values={vals} levels={levels} hour={hour} onHour={onHour} unit="пос." />
 
           {(railList.length > 0 || transfers.length > 0) && (
             <div>
-              <h4 className="ih" title="Пересадки рядом: метро, МЦК, МЦД и другие трамваи"><ArrowLeftRight size={15} /></h4>
+              <h4 className="ih sec-title" title="Пересадки рядом: метро, МЦК и МЦД в радиусе ~400 м, другие трамваи — в ~250 м"><ArrowLeftRight size={15} />Пересадки</h4>
               <div className="sd-list">
                 {railList.map((m) => (
                   <div key={`${m.kind}|${m.name}`} className="toprow static">
@@ -393,7 +407,6 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
   }
   const planWin = hardWin ?? softWin
   const peak = r.peak_hour
-  const top = [...stops].sort((a, b) => b.weight - a.weight).slice(0, 5)
   return (
     <div className={`ops-side sd ${scrolled ? 'scrolled' : ''}`}>
       {head}
@@ -472,30 +485,37 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
 
         <div>
           <DayBars values={r.boardings} levels={levels} hour={hour} onHour={onHour} unit="посадок" />
-          {wins.length > 0 && (
-            <div className="chips" style={{ marginTop: 6 }}>
-              {wins.map((w) => (
-                <button key={w.from} className={`winchip ${levelOf(w.max)}`} onClick={() => onHour(w.from)}
-                  title={`Перегрузка ${span(w)}: нужно +${w.extra} ваг.`}>
-                  <TriangleAlert size={12} />{hspan(w)}<b>+{w.extra}</b><TramSide size={12} /></button>
-              ))}
-            </div>
-          )}
         </div>
 
-        <div>
-          <h4 className="ih" title={`Больше всего садятся в ${hh(hour)}`}><Users size={15} />{hh(hour)}</h4>
+        {/* все станции ветки: поиск по названию, порядок по линии или по пассажирам в выбранный час */}
+        <div className="stlist">
+          <div className="st-head">
+            <h4>Станции</h4>
+            <button className={`st-sort ${byLoad ? 'on' : ''}`} onClick={() => setByLoad(!byLoad)} aria-pressed={byLoad}
+              title={byLoad ? `По пассажирам в ${hh(hour)} — нажмите, чтобы по порядку линии` : 'По порядку линии — нажмите, чтобы по пассажирам'}>
+              {byLoad ? <ArrowDownWideNarrow size={15} /> : <ListOrdered size={15} />}{byLoad ? 'по пассажирам' : 'по порядку'}
+            </button>
+          </div>
+          <label className="st-search">
+            <Search size={15} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск станции" aria-label="Поиск станции" />
+            {q && <button onClick={() => setQ('')} title="Очистить" aria-label="Очистить"><X size={14} /></button>}
+          </label>
           <div className="sd-list">
-            {top.map((s) => {
-              const rl = railOf(s.name)
-              return (
-                <div key={s.stop_id} className="toprow" onClick={() => onStop(s.stop_id)}>
-                  {rl ? <RailMark kind={rl.kind} /> : <span className="stopdot sm" style={{ borderColor: r.color }} />}
-                  <span>{nice(s.name)}</span>
-                  <span className="num">≈{fmt(r.boardings[hour] * s.weight)}/ч</span>
-                </div>
-              )
-            })}
+            {stops
+              .filter((s) => !q.trim() || nice(s.name).toLowerCase().includes(q.trim().toLowerCase()))
+              .sort((a, b) => (byLoad ? b.weight - a.weight : 0))
+              .map((s) => {
+                const rl = railOf(s.name)
+                return (
+                  <div key={s.stop_id} className="toprow" onClick={() => onStop(s.stop_id)} title={`${nice(s.name)}: ${fmt(r.boardings[hour] * s.weight)} посадок в ${hh(hour)}`}>
+                    {rl ? <RailMark kind={rl.kind} /> : <span className="stopdot sm" style={{ borderColor: r.color }} />}
+                    <span>{nice(s.name)}</span>
+                    <span className="num"><User size={13} />{fmt(r.boardings[hour] * s.weight)}</span>
+                  </div>
+                )
+              })}
+            {q.trim() && !stops.some((s) => nice(s.name).toLowerCase().includes(q.trim().toLowerCase())) && <div className="st-empty">Ничего не найдено</div>}
           </div>
         </div>
       </div>

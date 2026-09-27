@@ -4,10 +4,11 @@ import { overLabel, type DayRoute, type RouteGeo } from '../api'
 type Props = {
   geo: RouteGeo[]; routes: DayRoute[]; hour: number
   selected: number | null; onSelect: (r: number | null) => void
+  focused?: boolean // стрелки ← → сейчас листают маршруты
 }
 
 /** Номера маршрутов, по которым есть прогноз, — в постоянном порядке. */
-export default function RouteBar({ geo, routes, hour, selected, onSelect }: Props) {
+export default function RouteBar({ geo, routes, hour, selected, onSelect, focused }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const [edge, setEdge] = useState({ l: false, r: false })
 
@@ -42,7 +43,7 @@ export default function RouteBar({ geo, routes, hour, selected, onSelect }: Prop
   })
 
   return (
-    <div className={`float glass routebar ${edge.l ? 'fl' : ''} ${edge.r ? 'fr' : ''}`}>
+    <div className={`float glass routebar ${edge.l ? 'fl' : ''} ${edge.r ? 'fr' : ''} ${focused ? 'kfocus' : ''}`}>
       <div className="rb-scroll" ref={box} onScroll={measure}>
         {chips.map(({ g, idle, ratio, hot: h }) => (
           // цвет кнопки — цвет маршрута; перегрузка (≥100% норматива) — красный мигающий маячок и «+N%» прямо на кнопке

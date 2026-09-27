@@ -57,6 +57,22 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
   const setMode = (m: MapMode) => { setModeState(m); try { localStorage.setItem('tf-map-mode', m) } catch { /* без хранилища — просто не запоминаем */ } }
   const stopRef = useRef<string | null>(null)
   stopRef.current = stop
+  // куда идут стрелки ← →: выбрали остановку (или кликнули по её карточке) — листаем остановки; кликнули по ленте времени — время;
+  // кликнули по нижней панели маршрутов — маршруты
+  const [focus, setFocus] = useState<'time' | 'stops' | 'routes'>('time')
+  useEffect(() => { setFocus((f) => (stop ? 'stops' : f === 'stops' ? 'time' : f)) }, [stop])
+  useEffect(() => {
+    const down = (e: PointerEvent) => {
+      const t = e.target as HTMLElement
+      if (t.closest('.ops-time')) setFocus('time')
+      else if (t.closest('.routebar')) setFocus('routes')
+      else if (stopRef.current && t.closest('.ops-side')) setFocus('stops')
+    }
+    window.addEventListener('pointerdown', down, true)
+    return () => window.removeEventListener('pointerdown', down, true)
+  }, [])
+  const stopKeys = focus === 'stops' && stop != null
+  const routeKeys = focus === 'routes'
   const showCoefRef = useRef(false)
   showCoefRef.current = showCoef
   const day = useApi<DayView>('/api/day', { date, ...coef, v: version })
@@ -84,6 +100,24 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
   // порядок перелистывания веток в карточке — как на панели маршрутов внизу
   const routeList = useMemo(() => geo.map((g) => routes.find((r) => r.route === g.route)).filter((r): r is DayRoute => r != null), [geo, routes])
   const select = (r: number | null, s?: string | null) => { setRoute(r); setStop(s ?? null); if (r != null) setIntro(false) }
+  const routeNav = useRef<(d: -1 | 1) => void>(() => {})
+  routeNav.current = (d) => {
+    const ids = routeList.map((x) => x.route)
+    const i = route == null ? (d > 0 ? -1 : ids.length) : ids.indexOf(route)
+    const n = ids[i + d]
+    if (n != null) select(n)
+  }
+  useEffect(() => {
+    if (!routeKeys || drawer || menu || showCoef) return
+    const k = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return
+      e.preventDefault()
+      routeNav.current(e.key === 'ArrowLeft' ? -1 : 1)
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [routeKeys, drawer, menu, showCoef])
 
   const coefChanged = (Object.keys(DEFAULT_COEF) as (keyof typeof DEFAULT_COEF)[]).some((k) => coef[k] !== DEFAULT_COEF[k])
 
@@ -161,11 +195,11 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [geo, segments, schema, day.data, hour, route, stop, mode, drawer])
   const panelEl = useMemo(() => sel && (
-    <RoutePanel route={sel} geo={geo.find((g) => g.route === sel.route)} allGeo={geo} list={routeList} depots={day.data?.depots} date={date} hour={hour} stopId={stop} timeRef={timeRef} payCats={day.data?.pay_cats} keys={!drawer && !menu && !showCoef}
+    <RoutePanel route={sel} geo={geo.find((g) => g.route === sel.route)} allGeo={geo} list={routeList} depots={day.data?.depots} date={date} hour={hour} stopId={stop} timeRef={timeRef} payCats={day.data?.pay_cats} keys={!drawer && !menu && !showCoef} lr={stopKeys && !drawer && !menu && !showCoef}
       onClose={() => select(null)} onHour={(h) => { setPlaying(false); setLive(false); setMinute(h * 60) }} onStop={(s) => setStop(s)}
       onRoute={(r, s) => select(r, s)} />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [sel, geo, routeList, day.data, date, hour, stop, drawer, menu, showCoef])
+  ), [sel, geo, routeList, day.data, date, hour, stop, drawer, menu, showCoef, stopKeys])
 
   return (
     <div className={`ops ${sel ? 'side-open' : ''}`}>
@@ -173,7 +207,7 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
 
       {menuBtn('float menubtn glass')}
       <Timeline lead={menuBtn('seg-solo tl-menu')} date={date} setDate={setDate} minute={minute} setMinute={setMinute} playing={playing} setPlaying={setPlaying}
-        speed={speed} setSpeed={setSpeed} day={day.data} min={min} max={max} below={badges} keys={!drawer && !menu} live={live} setLive={setLive} />
+        speed={speed} setSpeed={setSpeed} day={day.data} min={min} max={max} below={badges} keys={!drawer && !menu && !stopKeys && !routeKeys} focused={focus === 'time' && stop != null} live={live} setLive={setLive} />
 
       {showCoef && (
         <div className="float glass coef-pop" style={{ top: menuAt.top, left: menuAt.left }}>
@@ -187,7 +221,7 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
 
       {intro && !sel && <Intro onClose={() => setIntro(false)} />}
 
-      <RouteBar geo={geo} routes={routes} hour={hour} selected={route} onSelect={(r) => select(r)} />
+      <RouteBar focused={routeKeys} geo={geo} routes={routes} hour={hour} selected={route} onSelect={(r) => select(r)} />
 
       {menu && (
         <>
