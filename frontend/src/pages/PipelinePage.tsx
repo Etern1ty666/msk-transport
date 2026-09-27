@@ -1,4 +1,4 @@
-import { ChevronRight, Database, X } from 'lucide-react'
+import { ChevronRight, Database, RotateCw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api, fmt } from '../api'
 import { Card, ErrorBox, Kpi, useApp } from '../components'
@@ -36,13 +36,13 @@ export default function PipelinePage() {
       <Card title={<>Конвейер обработки <span className={`dot ${running ? 'run' : pipelineConnected ? 'ok' : 'bad'}`} /></>}
         hint={<div className="row">
           <span>{running ? 'выполняется…' : total ? `последний прогон: ${total.toFixed(2)} с` : ''}</span>
-          <button className="btn" disabled={running} onClick={() => run(false)}>⟳ Перезапустить</button>
+          <button className="btn" disabled={running} onClick={() => run(false)}><RotateCw size={14} /> Перезапустить</button>
           <button className="btn primary" disabled={running} onClick={() => run(true)} title="DuckDB заново читает train.csv + test.csv (~10 ГБ), ~20–60 с"><Database size={14} /> Пересчитать из сырых (10 ГБ)</button>
         </div>}>
         <ErrorBox error={err} />
         <div className="flow">
           {stages.map((s, i) => (
-            <div key={s.key} className={`stage ${s.status}`} onClick={() => setFilter(filter === s.key ? '' : s.key)} style={{ cursor: 'pointer' }}>
+            <div key={s.key} className={`stage ${s.status}${filter === s.key ? ' sel' : ''}`} onClick={() => setFilter(filter === s.key ? '' : s.key)} style={{ cursor: 'pointer' }}>
               <div className="row"><span className="n">{String(i + 1).padStart(2, '0')}</span><div className="spacer" />
                 <span className={`tag ${STATUS[s.status][1]}`}>{STATUS[s.status][0]}{s.duration != null ? ` · ${s.duration} с` : ''}</span></div>
               <div className="t">{s.title}</div>

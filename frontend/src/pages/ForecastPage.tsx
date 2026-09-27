@@ -2,7 +2,7 @@ import { Clock3, Download } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { exportUrl, fmt, useApi, type Forecast } from '../api'
-import { axis, Card, SettingsHint, ErrorBox, Kpi, routeColor, tooltipStyle, useApp } from '../components'
+import { axis, Card, SettingsHint, ErrorBox, Kpi, routeColor, tooltipStyle, useApp, CH } from '../components'
 import { DatePicker } from '../ops/Timeline'
 
 export default function ForecastPage() {
@@ -97,14 +97,14 @@ export default function ForecastPage() {
         <Card title="Динамика прогноза" hint={fc.loading ? 'обновление…' : fc.data?.note}>
           <ResponsiveContainer width="100%" height={340}>
             <AreaChart data={fc.data?.series ?? []}>
-              <CartesianGrid stroke="#22314f" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={CH.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="t" {...axis} minTickGap={20} tickFormatter={(t: string) => (t.length > 10 ? t.slice(11) : t.length === 10 ? t.slice(5) : t)} />
               <YAxis {...axis} tickFormatter={(v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${Math.round(v / 1e3)}k` : String(v))} />
               <Tooltip {...tooltipStyle} formatter={(v, n) => [fmt(Number(v)), n === 'total' ? 'Всего' : `№${n}`]} />
               {keys.length > 1 && <Legend formatter={(v) => `№${v}`} wrapperStyle={{ fontSize: 12 }} />}
               {keys.map((k) => (
-                <Area key={k} dataKey={k} stackId="a" type="monotone" stroke={k === 'total' ? '#22d3ee' : routeColor(meta, k)}
-                  fill={k === 'total' ? '#22d3ee33' : routeColor(meta, k) + '66'} strokeWidth={1.5} isAnimationActive={false} />
+                <Area key={k} dataKey={k} stackId="a" type="monotone" stroke={k === 'total' ? CH.accent : routeColor(meta, k)}
+                  fill={k === 'total' ? CH.accent : routeColor(meta, k)} fillOpacity={k === 'total' ? 0.14 : 0.4} strokeWidth={1.5} isAnimationActive={false} />
               ))}
             </AreaChart>
           </ResponsiveContainer>

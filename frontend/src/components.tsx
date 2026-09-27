@@ -96,8 +96,11 @@ export const routeColor = (meta: Meta | null, r: number | string) =>
   meta?.routes.find((x) => String(x.route) === String(r))?.color ?? '#888'
 
 export const tooltipStyle = {
-  contentStyle: { background: '#111a2e', border: '1px solid #22314f', borderRadius: 8, fontSize: 12 },
-  labelStyle: { color: '#e2e8f0' },
-  itemStyle: { padding: 0, color: '#e2e8f0' }, // иначе recharts красит значение в цвет столбика — на тёмном фоне не читается
+  contentStyle: { background: 'var(--solid-2)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12, boxShadow: '0 6px 18px rgb(0 0 0 / .3)' },
+  labelStyle: { color: 'var(--text)' },
+  itemStyle: { padding: 0, color: 'var(--text)' }, // иначе recharts красит значение в цвет столбика — на фоне не читается
 }
-export const axis = { stroke: '#8b9ab5', fontSize: 11, tickLine: false }
+export const axis = { stroke: 'var(--muted)', fontSize: 11, tickLine: false }
+/** цвета графиков — из токенов темы (styles.css): факт — нейтральный, прогноз и выделенное — акцент */
+export const CH = { grid: 'var(--chart-grid)', fact: 'var(--chart-fact)', bar: 'var(--chart-bar)', accent: 'var(--accent)', strong: 'var(--strong)',
+  cursor: 'rgb(var(--ink-rgb) / .08)' }

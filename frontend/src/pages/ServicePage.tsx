@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
 import { fmt, useSocket, type SystemMetrics } from '../api'
-import { axis, Card, Kpi, tooltipStyle } from '../components'
+import { axis, Card, Kpi, tooltipStyle, CH } from '../components'
 
 const ENDPOINTS = [
   ['GET', '/api/forecast', 'Прогноз: horizon=day|month|year, date, month, date_from/date_to, route, stop_id, hour_from/hour_to, agg, by_route, коэффициенты'],
@@ -71,15 +71,15 @@ export default function ServicePage() {
         <Card title="Метрики в реальном времени" hint="обновление раз в секунду">
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={hist}>
-              <CartesianGrid stroke="#22314f" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={CH.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="t" {...axis} minTickGap={40} />
               <YAxis yAxisId="l" {...axis} />
               <YAxis yAxisId="r" orientation="right" {...axis} />
               <Tooltip {...tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line yAxisId="l" dataKey="rps" name="RPS" stroke="#22d3ee" dot={false} isAnimationActive={false} />
+              <Line yAxisId="l" dataKey="rps" name="RPS" stroke={CH.accent} dot={false} isAnimationActive={false} />
               <Line yAxisId="r" dataKey="p95_ms" name="p95, мс" stroke="#f97316" dot={false} isAnimationActive={false} />
-              <Line yAxisId="l" dataKey="cpu_percent" name="CPU, %" stroke="#818cf8" dot={false} isAnimationActive={false} />
+              <Line yAxisId="l" dataKey="cpu_percent" name="CPU, %" stroke={CH.fact} dot={false} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </Card>

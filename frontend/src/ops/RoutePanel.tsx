@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefO
 import { ArrowLeft, ArrowDownWideNarrow, ArrowLeftRight, RussianRuble, ChevronRight, Clock, EllipsisVertical, FileSpreadsheet, ListOrdered, Search, ShieldCheck, TrendingUp, TriangleAlert, User, Users, X } from 'lucide-react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { exportUrl, fmt, LEVEL_COLORS, LEVEL_TITLE, levelOf, problemWindows, TH, softExtra, freeWindow, type DayRoute, type Depot, type RouteGeo, type Stop } from '../api'
-import { axis, tooltipStyle, useApp } from '../components'
+import { axis, tooltipStyle, useApp, CH } from '../components'
 import Fleet, { FleetCalm, FreeFleet, TramSide } from './Fleet'
 import { hspan, Stat } from './Glyphs'
 import FleetStrip from './FleetStrip'
@@ -41,10 +41,10 @@ function DayBars({ values, levels, hour, onHour, unit }: { values: number[]; lev
     <ResponsiveContainer width="100%" height={96}>
       <BarChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }} onClick={(e: any) => e?.activeLabel != null && onHour(Number(e.activeLabel))}>
         <XAxis dataKey="h" {...axis} interval={2} tickFormatter={(h) => `${h}`} />
-        <Tooltip {...tooltipStyle} labelFormatter={(h) => hh(Number(h))} formatter={(v) => [`${fmt(Number(v))} ${unit}`, '']} separator="" cursor={{ fill: '#ffffff10' }} />
-        <ReferenceLine x={hour} stroke="#fff" strokeWidth={1.5} />
+        <Tooltip {...tooltipStyle} labelFormatter={(h) => hh(Number(h))} formatter={(v) => [`${fmt(Number(v))} ${unit}`, '']} separator="" cursor={{ fill: CH.cursor }} />
+        <ReferenceLine x={hour} stroke={CH.strong} strokeWidth={1.5} />
         <Bar dataKey="v" radius={[2, 2, 0, 0]}>
-          {data.map((d) => <Cell key={d.h} fill={levels[d.h] === 'high' || levels[d.h] === 'crit' ? LEVEL_COLORS[levels[d.h]] : '#2dd4bf'} fillOpacity={d.h === hour ? 1 : 0.75} />)}
+          {data.map((d) => <Cell key={d.h} fill={levels[d.h] === 'high' || levels[d.h] === 'crit' ? LEVEL_COLORS[levels[d.h]] : d.h === hour ? CH.accent : CH.bar} fillOpacity={d.h === hour ? 1 : 0.8} />)}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
@@ -457,7 +457,7 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
               </div>} rows={[
               ...(on ? [
                 { k: 'Нужно по нормативу', v: need },
-                { k: v >= need ? 'Запас' : 'Не хватает', v: v >= need ? `+${v - need}` : `−${need - v}`, color: v >= need ? '#86efac' : '#fca5a5' },
+                { k: v >= need ? 'Запас' : 'Не хватает', v: v >= need ? `+${v - need}` : `−${need - v}`, color: v >= need ? 'var(--t-ok)' : 'var(--t-bad)' },
                 { k: 'Посадок на вагон', v: `${fmt(r.boardings[hour] / v)} из ${fmt(r.norm)}` },
               ] : []),
               ...(home ? [

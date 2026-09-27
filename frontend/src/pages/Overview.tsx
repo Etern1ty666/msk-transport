@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Area, Bar, BarChart, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fmt, LEVEL_COLORS, useApi, type Forecast } from '../api'
-import { axis, Card, SettingsHint, ErrorBox, Kpi, routeColor, tooltipStyle, useApp } from '../components'
+import { axis, Card, SettingsHint, ErrorBox, Kpi, routeColor, tooltipStyle, useApp, CH } from '../components'
 import { DatePicker } from '../ops/Timeline'
 
 type Rec = { route: number; hour: number; boardings: number; vehicles: number; per_vehicle: number; load_ratio: number; level: string; extra_vehicles: number }
@@ -25,6 +25,7 @@ export default function Overview() {
   const avgWd = wd.length ? wd.reduce((s, p) => s + p.total, 0) / wd.length : 0
   const byRoute = Object.entries(fc.data?.by_route ?? {}).map(([r, v]) => ({ r: `№${r}`, route: r, v })).sort((a, b) => b.v - a.v)
   const bt = meta?.backtest_mean?.['Полная модель']
+  const peakH = Math.max(0, ...(hours.data?.series ?? []).map((p) => p.total))
 
   return (
     <>
@@ -41,13 +42,13 @@ export default function Overview() {
         <Card title="Посадки по дням: факт (сентябрь–октябрь) и прогноз (ноябрь–декабрь)" hint="с учётом коэффициентов">
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={series}>
-              <CartesianGrid stroke="#22314f" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={CH.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="t" {...axis} tickFormatter={(t) => t.slice(5)} minTickGap={24} />
               <YAxis {...axis} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
               <Tooltip {...tooltipStyle} formatter={(v) => fmt(Number(v))} />
-              <ReferenceLine x="2025-11-01" stroke="#22d3ee" strokeDasharray="4 4" label={{ value: 'точка прогноза', fill: '#22d3ee', fontSize: 11, position: 'insideTopLeft' }} />
-              <Area dataKey="fact" name="Факт" stroke="#818cf8" fill="#818cf833" strokeWidth={1.5} dot={false} />
-              <Line dataKey="forecast" name="Прогноз" stroke="#22d3ee" strokeWidth={2} dot={false} />
+              <ReferenceLine x="2025-11-01" stroke={CH.fact} strokeDasharray="4 4" label={{ value: 'точка прогноза', fill: 'var(--muted)', fontSize: 11, position: 'insideTopLeft' }} />
+              <Area dataKey="fact" name="Факт" stroke={CH.fact} fill={CH.fact} fillOpacity={0.12} strokeWidth={1.5} dot={false} />
+              <Line dataKey="forecast" name="Прогноз" stroke={CH.accent} strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </Card>
@@ -60,7 +61,7 @@ export default function Overview() {
             <BarChart data={byRoute} layout="vertical" margin={{ left: 0 }}>
               <XAxis type="number" {...axis} tickFormatter={(v) => `${(v / 1e6).toFixed(1)}M`} />
               <YAxis type="category" dataKey="r" {...axis} width={40} />
-              <Tooltip {...tooltipStyle} formatter={(v) => fmt(Number(v))} cursor={{ fill: '#ffffff08' }} />
+              <Tooltip {...tooltipStyle} formatter={(v) => fmt(Number(v))} cursor={{ fill: CH.cursor }} />
               <Bar dataKey="v" name="Посадки" radius={[0, 4, 4, 0]}
                 shape={(p: any) => <rect x={p.x} y={p.y} width={p.width} height={p.height} rx={3} fill={routeColor(meta, p.payload.route)} />} />
             </BarChart>
@@ -69,11 +70,14 @@ export default function Overview() {
         <Card title="Суточный профиль" hint="сумма за период по часам">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={hours.data?.series ?? []}>
-              <CartesianGrid stroke="#22314f" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={CH.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="t" {...axis} />
               <YAxis {...axis} tickFormatter={(v) => `${(v / 1e6).toFixed(1)}M`} />
-              <Tooltip {...tooltipStyle} formatter={(v) => fmt(Number(v))} cursor={{ fill: '#ffffff08' }} />
-              <Bar dataKey="total" name="Посадки" fill="#22d3ee" radius={[3, 3, 0, 0]} />
+              <Tooltip {...tooltipStyle} formatter={(v) => fmt(Number(v))} cursor={{ fill: CH.cursor }} />
+              <Bar dataKey="total" name="Посадки" radius={[3, 3, 0, 0]}>
+                {/* часы пик (от 90% максимума) — акцентом, остальные нейтральные */}
+                {(hours.data?.series ?? []).map((p) => <Cell key={p.t} fill={p.total >= peakH * 0.9 ? CH.accent : CH.bar} />)}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -85,7 +89,7 @@ export default function Overview() {
               <tbody>
                 {(recs.data ?? []).slice(0, 14).map((r) => (
                   <tr key={`${r.route}-${r.hour}`}>
-                    <td><span className="tag" style={{ color: routeColor(meta, r.route) }}>№{r.route}</span></td>
+                    <td><span className="rnum" style={{ background: routeColor(meta, r.route) }}>{r.route}</span></td>
                     <td>{r.hour}:00</td>
                     <td className="num" style={{ color: LEVEL_COLORS[r.level] }}>{fmt(r.per_vehicle)} <span className="note">({Math.round(r.load_ratio * 100)}%)</span></td>
                     <td className="num"><b>+{r.extra_vehicles}</b></td>

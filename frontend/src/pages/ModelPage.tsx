@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fmt, useApi } from '../api'
-import { axis, Card, ErrorBox, Kpi, routeColor, tooltipStyle, useApp } from '../components'
+import { axis, Card, ErrorBox, Kpi, routeColor, tooltipStyle, useApp, CH } from '../components'
 
 type Model = {
   params: Record<string, number | boolean>
@@ -47,7 +47,7 @@ export default function ModelPage() {
       </div>
 
       <Card title="Формула модели">
-        <div className="mono" style={{ fontSize: 15, color: 'var(--accent)' }}>{d.formula}</div>
+        <div className="formula mono">{d.formula}</div>
         <div className="note" style={{ marginTop: 8 }}>
           Профиль — усечённое среднее (trim {String(d.params.trim)}) за {String(d.params.lookback_days)} дней до точки прогноза по классам дня: пн / вт–чт / пт / сб / вс+праздники.
           Тренд — отношение последних {String(d.params.trend_days)} дней к окну в степени {String(d.params.trend_alpha)} (затухание).
@@ -60,13 +60,13 @@ export default function ModelPage() {
         <Card title="Бэктест: факт и прогноз по дням" hint="окно «октябрь», прогноз с 30.09">
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart data={bt.series}>
-              <CartesianGrid stroke="#22314f" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={CH.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="date" {...axis} tickFormatter={(t) => t.slice(5)} />
               <YAxis {...axis} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
               <Tooltip {...tooltipStyle} formatter={(v) => fmt(Number(v))} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="actual" name="Факт" fill="#818cf8" radius={[3, 3, 0, 0]} />
-              <Line dataKey="pred" name="Прогноз" stroke="#22d3ee" strokeWidth={2} dot={false} />
+              <Bar dataKey="actual" name="Факт" fill={CH.fact} radius={[3, 3, 0, 0]} />
+              <Line dataKey="pred" name="Прогноз" stroke={CH.accent} strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </Card>
@@ -74,13 +74,13 @@ export default function ModelPage() {
           <option value="">все маршруты</option>{meta?.routes.filter((r) => r.active).map((r) => <option key={r.route} value={r.route}>№{r.route}</option>)}</select>}>
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart data={hourly.data ?? []}>
-              <CartesianGrid stroke="#22314f" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={CH.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="hour" {...axis} />
               <YAxis {...axis} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
               <Tooltip {...tooltipStyle} formatter={(v) => fmt(Number(v))} labelFormatter={(h) => `${h}:00`} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="actual" name="Факт" fill="#818cf8" radius={[3, 3, 0, 0]} />
-              <Line dataKey="pred" name="Прогноз" stroke="#22d3ee" strokeWidth={2} dot={false} />
+              <Bar dataKey="actual" name="Факт" fill={CH.fact} radius={[3, 3, 0, 0]} />
+              <Line dataKey="pred" name="Прогноз" stroke={CH.accent} strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </Card>
@@ -106,11 +106,11 @@ export default function ModelPage() {
         <Card title="WAPE-score по маршрутам" hint="окно «октябрь»">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={perRoute}>
-              <CartesianGrid stroke="#22314f" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={CH.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="r" {...axis} />
               <YAxis {...axis} domain={[0.6, 1]} />
-              <Tooltip {...tooltipStyle} formatter={(v) => Number(v).toFixed(4)} cursor={{ fill: '#ffffff08' }} />
-              <ReferenceLine y={0.88} stroke="#22c55e" strokeDasharray="4 4" label={{ value: '0.88 — макс. балл', fill: '#22c55e', fontSize: 11, position: 'insideTopRight' }} />
+              <Tooltip {...tooltipStyle} formatter={(v) => Number(v).toFixed(4)} cursor={{ fill: CH.cursor }} />
+              <ReferenceLine y={0.88} stroke="var(--ok)" strokeDasharray="4 4" label={{ value: '0.88 — макс. балл', fill: 'var(--ok)', fontSize: 11, position: 'insideTopRight' }} />
               <Bar dataKey="v" radius={[3, 3, 0, 0]}>{perRoute.map((p) => <Cell key={p.route} fill={routeColor(meta, p.route)} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -125,10 +125,10 @@ export default function ModelPage() {
           {Array.from({ length: 24 }, (_, h) => <div key={h} className="lbl" style={{ justifyContent: 'center' }}>{h}</div>)}
           {d.profile_weekday.routes.map((r, i) => (
             <Fragment key={r}>
-              <div className="lbl" style={{ color: routeColor(meta, r) }}>№{r}</div>
+              <div className="lbl"><span className="rnum" style={{ background: routeColor(meta, r) }}>{r}</span></div>
               {d.profile_weekday.matrix[i].map((v, h) => (
                 <div key={`${r}-${h}`} className="c" title={`№${r}, ${h}:00 — ${fmt(v)} посадок`}
-                  style={{ background: `rgba(34,211,238,${(v / maxP) ** 0.7})` }} />
+                  style={{ background: `rgb(var(--accent-rgb) / ${(v / maxP) ** 0.7})` }} />
               ))}
             </Fragment>
           ))}
@@ -153,7 +153,8 @@ export default function ModelPage() {
         </Card>
         <Card title="Тренд маршрутов" hint="последние 2 недели к окну">
           <div className="chips">
-            {Object.entries(d.trend).map(([r, v]) => <span key={r} className="tag" style={{ color: v > 1 ? 'var(--ok)' : v < 1 ? 'var(--warn)' : undefined }}>№{r}: ×{v.toFixed(3)}</span>)}
+            {Object.entries(d.trend).map(([r, v]) => <span key={r} className="trend-chip"><span className="rnum" style={{ background: routeColor(meta, r) }}>{r}</span>
+              <b style={{ color: v > 1 ? 'var(--t-ok)' : v < 1 ? 'var(--t-warn)' : undefined }}>×{v.toFixed(3)}</b></span>)}
           </div>
         </Card>
       </div>
@@ -161,10 +162,10 @@ export default function ModelPage() {
       <div className="grid g2">
         <Card title="Сезонный индекс (горизонт «год»)" hint="месяц к октябрю, будни; 50% маршрут + 50% сеть">
           <div className="scroll"><table className="t">
-            <thead><tr><th>Месяц</th>{d.season_index.routes.map((r) => <th key={r} className="num">№{r}</th>)}</tr></thead>
+            <thead><tr><th>Месяц</th>{d.season_index.routes.map((r) => <th key={r} className="num"><span className="rnum" style={{ background: routeColor(meta, r) }}>{r}</span></th>)}</tr></thead>
             <tbody>{d.season_index.months.map((mo, i) => (
               <tr key={mo}><td className="mono">{mo}</td>{d.season_index.matrix[i].map((v, j) =>
-                <td key={j} className="num" style={{ color: v < 0.95 ? 'var(--warn)' : v > 1.02 ? 'var(--ok)' : undefined }}>{v.toFixed(2)}</td>)}</tr>
+                <td key={j} className="num" style={{ color: v < 0.95 ? 'var(--t-warn)' : v > 1.02 ? 'var(--t-ok)' : undefined }}>{v.toFixed(2)}</td>)}</tr>
             ))}</tbody>
           </table></div>
         </Card>

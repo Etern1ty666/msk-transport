@@ -1,5 +1,5 @@
 import { ArrowLeft, ChartNoAxesCombined, Database, MousePointerClick, RefreshCw, Server, Settings as Gear, Sigma, Table2, TriangleAlert, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, DEFAULT_COEF, OFFLINE, TH, useSocket, type Coef, type LogEvent, type Meta, type RouteGeo, type Schema, type Segment, type Settings, type Stage } from './api'
 import { AppCtx } from './components'
 import OpsScreen from './ops/OpsScreen'
@@ -34,6 +34,9 @@ const pageOf = (k: string) => ALIAS[k] ?? (k in PAGES ? k : null)
 export default function App() {
   const hashKey = () => pageOf(window.location.hash.slice(1))
   const [drawer, setDrawer] = useState<string | null>(hashKey)
+  const pageEl = useRef<HTMLDivElement>(null)
+  // страница прокручивается внутри себя: при переходе на другую вкладку — снова сверху
+  useEffect(() => { pageEl.current?.scrollTo(0, 0) }, [drawer])
   const [settingsPopup, setSettingsPopup] = useState(false)
   const [meta, setMeta] = useState<Meta | null>(null)
   const [geo, setGeo] = useState<RouteGeo[]>([])
@@ -128,7 +131,7 @@ export default function App() {
         ) : null} />
       {metaError && !meta && d && !d.side && <div className="float glass" style={{ bottom: 70, left: '50%', transform: 'translateX(-50%)', padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'center' }}><TriangleAlert size={16} /> {metaError === OFFLINE ? `${OFFLINE}. Повторяю подключение…` : metaError}</div>}
       {d && Page && !d.side && (
-        <div className="page">
+        <div className="page" ref={pageEl}>
           <header className="page-bar">
             <button className="pb-back" onClick={() => openDrawer(null)} title="К карте (Esc)"><ArrowLeft size={16} /> Карта</button>
             {d.group && <span className="pb-group">{GROUPS[d.group]}</span>}
