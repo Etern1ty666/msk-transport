@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Area, Bar, BarChart, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fmt, LEVEL_COLORS, useApi, type Forecast } from '../api'
 import { axis, Card, SettingsHint, ErrorBox, Kpi, routeColor, tooltipStyle, useApp } from '../components'
+import { DatePicker } from '../ops/Timeline'
 
 type Rec = { route: number; hour: number; boardings: number; vehicles: number; per_vehicle: number; load_ratio: number; level: string; extra_vehicles: number }
 
@@ -76,7 +77,7 @@ export default function Overview() {
             </BarChart>
           </ResponsiveContainer>
         </Card>
-        <Card title="Где не хватает вагонов" hint={<input type="date" value={recDate} min="2025-11-01" max="2026-10-31" onChange={(e) => setRecDate(e.target.value)} />}>
+        <Card title="Где не хватает вагонов" hint={<div className="overview-date"><DatePicker date={recDate} setDate={setRecDate} min={meta?.forecast.from ?? '2025-11-01'} max={meta?.forecast.to ?? '2026-10-31'} compact /></div>}>
           <ErrorBox error={recs.error} />
           <div className="scroll" style={{ maxHeight: 280 }}>
             <table className="t">

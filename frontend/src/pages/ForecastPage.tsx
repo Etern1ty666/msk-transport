@@ -1,15 +1,9 @@
-import { Download, Thermometer } from 'lucide-react'
+import { Clock3, Download } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { exportUrl, fmt, useApi, type Forecast } from '../api'
-import { axis, Card, SettingsHint, ErrorBox, Kpi, RouteChips, routeColor, tooltipStyle, useApp } from '../components'
-
-type Decomp = {
-  route: number; date: string; day_type: string; special: string; school_holiday: boolean
-  weather: { t_mean: number; precip: number; snowfall: number; wind: number } | null
-  waterfall: { name: string; value: number }[]
-}
-const DT: Record<string, string> = { wd: 'будний', sat: 'суббота', sun: 'воскресенье', hol: 'праздник' }
+import { axis, Card, SettingsHint, ErrorBox, Kpi, routeColor, tooltipStyle, useApp } from '../components'
+import { DatePicker } from '../ops/Timeline'
 
 export default function ForecastPage() {
   const { meta, geo, coef, version } = useApp()
@@ -30,66 +24,64 @@ export default function ForecastPage() {
     agg: agg || undefined, ...coef,
   }
   const fc = useApi<Forecast>('/api/forecast', { ...params, by_route: byRoute && !stop, v: version })
-  const decRoute = routes[0] ?? 17
-  const dec = useApi<Decomp>(horizon === 'day' ? '/api/decompose' : null, { route: decRoute, date, ...coef, v: version })
-
   const keys = useMemo(() => byRoute && !stop ? Object.keys(fc.data?.by_route ?? {}).filter((k) => (fc.data?.by_route[k] ?? 0) > 0) : ['total'], [fc.data, byRoute, stop])
-  // водопад: ось начинается не с нуля, иначе вклады в ±1–20% не видны
-  const waterfall = useMemo(() => {
-    const w = dec.data?.waterfall ?? []
-    let acc = 0
-    const levels: number[] = []
-    const rows = w.map((x, i) => {
-      const edge = i === 0 || i === w.length - 1
-      const from = edge ? 0 : acc
-      acc = edge ? x.value : acc + x.value
-      levels.push(acc)
-      return { name: x.name, from, to: acc, raw: x.value, edge }
-    })
-    const lo = levels.length ? Math.floor(Math.min(...levels) * 0.85 / 1000) * 1000 : 0
-    return rows.map((r) => {
-      const a = r.edge ? lo : Math.min(r.from, r.to)
-      const b = r.edge ? r.to : Math.max(r.from, r.to)
-      return { ...r, base: a - lo, value: Math.max(b - a, 1), lo }
-    })
-  }, [dec.data])
-  const wfLo = waterfall[0]?.lo ?? 0
 
   return (
     <>
       <Card>
-        <div className="row" style={{ gap: 18, alignItems: 'end' }}>
-          <label className="f">Горизонт
-            <div className="seg">
-              {(['day', 'month', 'year'] as const).map((h) => (
-                <button key={h} className={horizon === h ? 'on' : ''} onClick={() => { setHorizon(h); setAgg('') }}>{meta?.horizons[h]?.title ?? h}</button>
-              ))}
+        <div className="forecast-panel">
+          <div className="forecast-controls">
+            <label className="f">Период
+              <div className="seg" aria-label="Горизонт прогноза">
+                {(['day', 'month', 'year'] as const).map((h) => (
+                  <button key={h} type="button" aria-pressed={horizon === h} className={horizon === h ? 'on' : ''} onClick={() => { setHorizon(h); setAgg('') }}>{meta?.horizons[h]?.title ?? h}</button>
+                ))}
+              </div>
+            </label>
+            {horizon === 'day' && <div className="forecast-date"><span>Дата</span><DatePicker date={date} setDate={setDate} min={meta?.forecast.from ?? '2025-11-01'} max={meta?.forecast.to ?? '2026-10-31'} /></div>}
+            {horizon === 'month' && <label className="f">Месяц<select value={month} onChange={(e) => setMonth(e.target.value)}>{meta?.months.map((m) => <option key={m}>{m}</option>)}</select></label>}
+            <div className="f forecast-time-field">
+              <span>Интервал</span>
+              <div className="forecast-time-range">
+                <Clock3 size={16} aria-hidden="true" />
+                <select aria-label="Начало интервала" value={h0} onChange={(e) => setH0(Number(e.target.value))}>
+                  {Array.from({ length: 24 }, (_, h) => <option key={h} value={h} disabled={h > h1}>{String(h).padStart(2, '0')}:00</option>)}
+                </select>
+                <span className="forecast-time-separator">—</span>
+                <select aria-label="Конец интервала" value={h1} onChange={(e) => setH1(Number(e.target.value))}>
+                  {Array.from({ length: 24 }, (_, h) => <option key={h} value={h} disabled={h < h0}>{String(h + 1).padStart(2, '0')}:00</option>)}
+                </select>
+              </div>
             </div>
-          </label>
-          {horizon === 'day' && <label className="f">Дата<input type="date" value={date} min="2025-11-01" max="2026-10-31" onChange={(e) => setDate(e.target.value)} /></label>}
-          {horizon === 'month' && <label className="f">Месяц
-            <select value={month} onChange={(e) => setMonth(e.target.value)}>{meta?.months.map((m) => <option key={m}>{m}</option>)}</select></label>}
-          <label className="f">Часы с<input type="number" min={0} max={23} value={h0} onChange={(e) => setH0(Math.min(Number(e.target.value), h1))} /></label>
-          <label className="f">по<input type="number" min={0} max={23} value={h1} onChange={(e) => setH1(Math.max(Number(e.target.value), h0))} /></label>
-          <label className="f">Агрегация
-            <select value={agg} onChange={(e) => setAgg(e.target.value)}>
-              <option value="">авто ({meta?.horizons[horizon]?.agg})</option>
-              <option value="hour">по часам</option><option value="day">по дням</option><option value="month">по месяцам</option>
-              <option value="hour_of_day">профиль по часу суток</option><option value="weekday">по дню недели</option>
-            </select></label>
-          <label className="f">Остановка
-            <select value={stop} disabled={routes.length !== 1} onChange={(e) => setStop(e.target.value)} style={{ maxWidth: 240 }}>
-              <option value="">{routes.length === 1 ? 'весь маршрут' : 'выберите 1 маршрут'}</option>
-              {stops.map((s) => <option key={s.stop_id} value={s.stop_id}>{s.name}</option>)}
-            </select></label>
-          <label className="f" style={{ flexDirection: 'row' }}><span>&nbsp;</span>
-            <span className="row"><input type="checkbox" checked={byRoute} onChange={(e) => setByRoute(e.target.checked)} /> по маршрутам</span></label>
-          <div className="spacer" />
-          <a className="btn" href={exportUrl({ ...params, format: 'csv' })}><Download size={14} /> CSV</a>
-          <a className="btn" href={exportUrl({ ...params, format: 'xlsx' })}><Download size={14} /> XLSX</a>
-          <a className="btn primary" href="/api/submission" title="Файл для платформы хакатона: ноябрь–декабрь, 14 640 строк"><Download size={14} /> submission.csv</a>
+            <label className="f">Агрегация
+              <select value={agg} onChange={(e) => setAgg(e.target.value)}>
+                <option value="">{horizon === 'day' ? 'По часам' : horizon === 'month' ? 'По дням' : 'По месяцам'}</option>
+                <option value="hour">По часам</option><option value="day">По дням</option><option value="month">По месяцам</option>
+                <option value="hour_of_day">По часу суток</option><option value="weekday">По дню недели</option>
+              </select>
+            </label>
+          </div>
+          <div className="forecast-route-row">
+            <label className="f">Маршрут
+              <select value={routes[0] ?? ''} onChange={(e) => { setRoutes(e.target.value ? [Number(e.target.value)] : []); setStop('') }}>
+                <option value="">Все маршруты</option>
+                {meta?.routes.map((r) => <option key={r.route} value={r.route}>№{r.route}</option>)}
+              </select>
+            </label>
+            {routes.length === 1 && <label className="f">Остановка
+              <select value={stop} onChange={(e) => setStop(e.target.value)}>
+                <option value="">Весь маршрут</option>
+                {stops.map((s) => <option key={s.stop_id} value={s.stop_id}>{s.name}</option>)}
+              </select>
+            </label>}
+            <label className="forecast-check"><input type="checkbox" checked={byRoute} onChange={(e) => setByRoute(e.target.checked)} /> По маршрутам</label>
+          </div>
+          <div className="forecast-downloads">
+            <a className="btn primary" href={exportUrl({ ...params, format: 'csv' })} download><Download size={18} /> Скачать CSV</a>
+            <a className="btn primary" href={exportUrl({ ...params, format: 'xlsx' })} download><Download size={18} /> Скачать XLSX</a>
+            <a className="btn forecast-submission-link" href="/api/submission" download><Download size={16} /> submission.csv</a>
+          </div>
         </div>
-        <div style={{ marginTop: 12 }}><RouteChips value={routes} onChange={(v) => { setRoutes(v); setStop('') }} /></div>
       </Card>
 
       <ErrorBox error={fc.error} />
@@ -119,45 +111,6 @@ export default function ForecastPage() {
         <SettingsHint />
       </div>
 
-      <div className="grid g2">
-        {horizon === 'day' && (
-          <Card title={`Из чего складывается прогноз: маршрут №${decRoute}, ${date}`} hint={routes.length !== 1 ? 'выберите маршрут' : undefined}>
-            <ErrorBox error={dec.error} />
-            {dec.data && (
-              <div className="row note" style={{ marginBottom: 8 }}>
-                <span className="tag">{DT[dec.data.day_type] ?? dec.data.day_type}</span>
-                {dec.data.special && <span className="tag run">{dec.data.special}</span>}
-                {dec.data.school_holiday && <span className="tag">школьные каникулы</span>}
-                {dec.data.weather ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Thermometer size={14} /> {dec.data.weather.t_mean}°C · осадки {dec.data.weather.precip} мм · снег {dec.data.weather.snowfall} см</span> : <span>погода: нет данных (нейтрально)</span>}
-              </div>
-            )}
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={waterfall}>
-                <CartesianGrid stroke="#22314f" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" {...axis} />
-                <YAxis {...axis} tickFormatter={(v) => `${Math.round((v + wfLo) / 1000)}k`} />
-                <Tooltip {...tooltipStyle} formatter={(_v, _n, p: any) => [(p.payload.raw > 0 && !p.payload.edge ? '+' : '') + fmt(p.payload.raw), 'посадок']} cursor={{ fill: '#ffffff08' }} />
-                <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} />
-                <Bar dataKey="value" stackId="w" radius={[3, 3, 0, 0]}>
-                  {waterfall.map((w, i) => <Cell key={i} fill={w.edge ? '#22d3ee' : w.raw >= 0 ? '#22c55e' : '#ef4444'} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        )}
-        <Card title="Таблица прогноза" hint={`${fc.data?.series.length ?? 0} строк`}>
-          <div className="scroll">
-            <table className="t">
-              <thead><tr><th>Период</th>{keys.map((k) => <th key={k} className="num">{k === 'total' ? 'Посадки' : `№${k}`}</th>)}{keys.length > 1 && <th className="num">Всего</th>}</tr></thead>
-              <tbody>
-                {(fc.data?.series ?? []).map((p) => (
-                  <tr key={p.t}><td className="mono">{p.t}</td>{keys.map((k) => <td key={k} className="num">{fmt(Number(p[k]))}</td>)}{keys.length > 1 && <td className="num"><b>{fmt(p.total)}</b></td>}</tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </div>
     </>
   )
 }

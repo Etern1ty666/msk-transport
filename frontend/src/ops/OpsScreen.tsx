@@ -9,7 +9,7 @@ import Timeline, { useLiveWeather } from './Timeline'
 import WeatherFx, { type Precip } from './WeatherFx'
 
 export const MENU = [
-  { key: 'summary', i: ChartNoAxesCombined, t: 'Сводка' },
+  { key: 'forecast', i: ChartNoAxesCombined, t: 'Дашборд' },
   { key: 'about', i: BookOpenText, t: 'О проекте' },
   { key: 'settings', i: Gear, t: 'Настройки' },
 ]

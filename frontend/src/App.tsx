@@ -1,25 +1,28 @@
-import { ArrowLeft, BookOpenText, ChartNoAxesCombined, RefreshCw, Settings as Gear, TriangleAlert, X } from 'lucide-react'
+import { ArrowLeft, BookOpenText, ChartNoAxesCombined, RefreshCw, Settings as Gear, Table2, TriangleAlert, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, DEFAULT_COEF, OFFLINE, TH, useSocket, type Coef, type LogEvent, type Meta, type RouteGeo, type Schema, type Segment, type Settings, type Stage } from './api'
 import { AppCtx } from './components'
 import OpsScreen from './ops/OpsScreen'
 import AboutPage from './pages/AboutPage'
-import SummaryPage from './pages/SummaryPage'
+import ForecastPage from './pages/ForecastPage'
+import Overview from './pages/Overview'
 import SettingsPage from './pages/SettingsPage'
 
 // меню — три раздела; прежние адреса (#overview, #model …) открывают раздел, куда вошла их страница
 // side — открывается панелью слева поверх карты (как карточка ветки); иначе — страница на весь экран
 const PAGES: Record<string, { title: string; sub: string; icon: typeof Gear; el: () => React.ReactElement; side?: boolean; wide?: boolean }> = {
+  forecast: { title: 'Прогноз и выгрузка', sub: 'День, месяц, год · маршрут, остановка, интервал · CSV и XLSX', icon: Table2, el: ForecastPage },
+  summary: { title: 'Аналитика', sub: 'Пассажиропоток, пики и потребность в вагонах', icon: ChartNoAxesCombined, el: Overview },
   about: { title: 'О проекте', sub: 'Как пользоваться, как считается прогноз, данные и сервис', icon: BookOpenText, el: AboutPage },
-  summary: { title: 'Сводка', sub: 'Показатели прогноза, где не хватает вагонов, таблица и выгрузка', icon: ChartNoAxesCombined, el: SummaryPage },
   settings: { title: 'Настройки', sub: 'Коэффициенты прогноза, норматив и пороги рекомендаций — сохраняются на сервере и действуют для всех', icon: Gear, el: SettingsPage, side: true },
 }
-const ALIAS: Record<string, string> = { overview: 'summary', forecast: 'summary', model: 'about', pipeline: 'about', service: 'about', use: 'about' }
+const ALIAS: Record<string, string> = { overview: 'summary', model: 'about', pipeline: 'about', service: 'about', use: 'about' }
 const pageOf = (k: string) => ALIAS[k] ?? (k in PAGES ? k : null)
 
 export default function App() {
   const hashKey = () => pageOf(window.location.hash.slice(1))
   const [drawer, setDrawer] = useState<string | null>(hashKey)
+  const [settingsPopup, setSettingsPopup] = useState(false)
   const [meta, setMeta] = useState<Meta | null>(null)
   const [geo, setGeo] = useState<RouteGeo[]>([])
   const [segments, setSegments] = useState<Segment[]>([])
@@ -45,10 +48,10 @@ export default function App() {
     const h = () => setDrawer(hashKey())
     window.addEventListener('hashchange', h)
     window.addEventListener('popstate', h)
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && hashKey()) openDrawer(null) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && settingsPopup) setSettingsPopup(false); else if (e.key === 'Escape' && hashKey()) openDrawer(null) }
     window.addEventListener('keydown', esc)
     return () => { window.removeEventListener('hashchange', h); window.removeEventListener('popstate', h); window.removeEventListener('keydown', esc) }
-  }, [openDrawer])
+  }, [openDrawer, settingsPopup])
 
   const loadMeta = useCallback(() => {
     api<Meta>('/api/meta').then((m) => { setMeta(m); setMetaError(null) }).catch((e) => setMetaError(e.message))
@@ -84,9 +87,13 @@ export default function App() {
 
   // ветки без истории (сейчас — №5: в данных ни одной успешной валидации) не показываем в выборе и не открываем
   const geoActive = useMemo(() => (meta ? geo.filter((g) => meta.routes.find((r) => r.route === g.route)?.active !== false) : geo), [meta, geo])
+  const go = useCallback((k: string) => {
+    if (k === 'settings' && drawer && drawer !== 'settings') setSettingsPopup(true)
+    else openDrawer(k)
+  }, [drawer, openDrawer])
   const ctx = useMemo(() => ({ meta, geo: geoActive, segments, allRoutes, schema, coef, settings, saveSettings, resetSettings, settingsRev,
-    stages, logs, running, pipelineConnected: connected, version, go: openDrawer }),
-  [meta, geoActive, segments, allRoutes, schema, coef, settings, saveSettings, resetSettings, settingsRev, stages, logs, running, connected, version, openDrawer])
+    stages, logs, running, pipelineConnected: connected, version, go }),
+  [meta, geoActive, segments, allRoutes, schema, coef, settings, saveSettings, resetSettings, settingsRev, stages, logs, running, connected, version, go])
   const d = drawer ? PAGES[drawer] : null
   const Page = d?.el
 
@@ -112,6 +119,11 @@ export default function App() {
         <div className="page">
           <header className="page-bar">
             <button className="pb-back" onClick={() => openDrawer(null)} title="К карте (Esc)"><ArrowLeft size={16} /> Карта</button>
+            <nav className="pb-tabs">
+              {Object.entries(PAGES).filter(([k]) => k !== 'settings').map(([k, v]) => (
+                <button key={k} className={k === drawer ? 'on' : ''} onClick={() => openDrawer(k)}><v.icon size={15} strokeWidth={1.75} /><span>{v.title}</span></button>
+              ))}
+            </nav>
             {running && <span className="pb-run"><RefreshCw size={13} className="spin" /> пересборка модели</span>}
           </header>
           <main className="page-body">
@@ -120,6 +132,15 @@ export default function App() {
           </main>
         </div>
       )}
+      {settingsPopup && <div className="settings-modal-back ops" onMouseDown={() => setSettingsPopup(false)}>
+        <div className="ops-side sd side-page settings-popup-panel" role="dialog" aria-modal="true" aria-label="Настройки" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="sd-top"><div className="sd-bar">
+            <button className="sd-close" onClick={() => setSettingsPopup(false)} title="Закрыть (Esc)" aria-label="Закрыть"><X size={20} /></button>
+            <span className="sd-id"><span className="sd-name"><span className="t">Настройки</span></span></span>
+          </div></div>
+          <div className="sd-body"><SettingsPage /></div>
+        </div>
+      </div>}
     </AppCtx.Provider>
   )
 }

@@ -53,7 +53,7 @@ export function useLiveWeather(on: boolean) {
   return w
 }
 
-function DatePicker({ date, setDate, min, max }: { date: string; setDate: (d: string) => void; min: string; max: string }) {
+export function DatePicker({ date, setDate, min, max, compact = false }: { date: string; setDate: (d: string) => void; min: string; max: string; compact?: boolean }) {
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(() => ({ y: +date.slice(0, 4), m: +date.slice(5, 7) - 1 }))
   const [level, setLevel] = useState<'days' | 'months' | 'years'>('days')
@@ -81,7 +81,7 @@ function DatePicker({ date, setDate, min, max }: { date: string; setDate: (d: st
   const years = Array.from({ length: maxY - minY + 1 }, (_, i) => minY + i)
 
   return (
-    <div className="dp" ref={ref}>
+    <div className={`dp${compact ? ' compact' : ''}`} ref={ref}>
       <button className="dp-arrow" title="Предыдущий день" disabled={date <= min} onClick={() => setDate(shift(date, -1))}><ChevronLeft size={18} /></button>
       <button className={`dp-btn ${open ? 'on' : ''}`} onClick={() => setOpen(!open)}>
         <CalendarDays size={15} className="dp-ico" />{+date.slice(8)} <span className="dp-mfull">{MONTHS_GEN[+date.slice(5, 7) - 1]}</span><span className="dp-mshort">{MONTHS_GEN[+date.slice(5, 7) - 1].slice(0, 3)}</span><span className="dp-year"> {date.slice(0, 4)}</span>

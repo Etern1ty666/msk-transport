@@ -1,16 +1,12 @@
-import { ArrowLeftRight, Clock, Download, Keyboard, LayoutDashboard, MousePointerClick, SlidersHorizontal, TrainFront, Users } from 'lucide-react'
-import { Card, useApp } from '../components'
+import { ArrowLeftRight, Clock, Keyboard, MousePointerClick, TrainFront, Users } from 'lucide-react'
+import { Card } from '../components'
 import ModelPage from './ModelPage'
 import PipelinePage from './PipelinePage'
 import ServicePage from './ServicePage'
 import { Section, SectionNav, useScrollToHash } from './Sections'
 
-const num = (v: number, d = 3) => v.toFixed(d).replace('.', ',')
-
 /** «О проекте»: как пользоваться сервисом, как считается прогноз, откуда данные и как устроен сервис — одной страницей. */
 export default function AboutPage() {
-  const { meta, go } = useApp()
-  const wape = meta?.backtest_mean?.['Полная модель'] ?? 0
   useScrollToHash({ use: 'ab-use', model: 'ab-model', pipeline: 'ab-pipeline', service: 'ab-service' })
   return (
     <>
@@ -32,19 +28,6 @@ export default function AboutPage() {
               <li><ArrowLeftRight size={18} /><span>Кнопка с картой справа — переключить подложку: схема маршрутов или городская карта.</span></li>
             </ol>
           </Card>
-          <Card title="Точность и разделы">
-            <div className="intro-score">
-              <div className="is-row"><span>Точность модели (WAPE-score)</span><b>{wape ? num(wape) : '—'}</b></div>
-              <div className="is-bar"><i style={{ width: `${wape * 100}%` }} /><em style={{ left: '48%' }} title="baseline организаторов" /></div>
-              <div className="is-foot"><span>baseline организаторов — 0,48</span><span>1,0 — идеально</span></div>
-            </div>
-            <div className="about-links">
-              <button className="btn" onClick={() => go('summary')}><LayoutDashboard size={15} />Сводка — показатели, таблица, выгрузка</button>
-              <button className="btn" onClick={() => go('settings')}><SlidersHorizontal size={15} />Настройки — коэффициенты и пороги</button>
-              <a className="btn" href="/api/submission"><Download size={15} />submission.csv</a>
-            </div>
-          </Card>
-        </div>
       </Section>
 
       <Section id="ab-model" title="Как считается прогноз"
