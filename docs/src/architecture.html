@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1b1f2a;--mute:#5f6673;--faint:#9aa0aa;--rule:#e3e5e9;--line:#0078c8;--win:#00a661;--warn:#e03131;--paper:#fff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1600px;background:var(--paper);font-family:'Golos Text',system-ui,sans-serif;color:var(--ink);padding:72px 80px 64px}
+h1{font-size:52px;font-weight:700;letter-spacing:-.025em;line-height:1.05;max-width:1440px}
+.lead{font-size:21px;color:var(--mute);margin-top:14px;max-width:900px;line-height:1.45}
+
+/* трамвайная линия */
+.route{position:relative;margin:78px 0 0;height:1px}
+.track{position:absolute;left:0;right:0;top:0;height:14px;border-radius:7px;background:var(--line)}
+.stations{display:grid;grid-template-columns:1fr 1fr 1.1fr 1fr 1.45fr;gap:28px;position:relative}
+.st{position:relative;padding-top:48px}
+.st::before{content:"";position:absolute;left:0;top:-7px;width:28px;height:28px;border-radius:50%;background:#fff;border:6px solid var(--line)}
+.st.big::before{width:40px;height:40px;top:-13px;border-width:8px}
+.st.win::before{border-color:var(--win)}
+.st.end::before{border-color:var(--warn)}
+.st h3{font-size:17px;font-weight:600;color:var(--mute)}
+.st .v{font-size:40px;font-weight:700;letter-spacing:-.02em;margin-top:6px;line-height:1.05}
+.st.big .v{font-size:64px;white-space:nowrap}
+.st.win .v{color:var(--win)}
+.st .c{font-size:17px;line-height:1.45;margin-top:10px;color:var(--ink)}
+.st .f{font-size:14px;color:var(--faint);margin-top:12px;line-height:1.5}
+.decision{margin-top:10px;display:flex;gap:10px;align-items:center;font-size:24px;font-weight:600;line-height:1.2}
+.chip{display:inline-grid;place-items:center;min-width:52px;height:40px;padding:0 8px;border-radius:9px;color:#fff;font-weight:700;font-size:22px}
+
+/* нижняя часть */
+.bottom{display:grid;grid-template-columns:1.2fr 1fr;gap:80px;margin-top:84px;padding-top:44px;border-top:2px solid var(--rule)}
+h2{font-size:26px;font-weight:700;letter-spacing:-.01em;margin-bottom:24px}
+.eff{display:grid;grid-template-columns:220px 1fr 200px;align-items:center;gap:18px;margin-bottom:18px;font-size:18px}
+.eff .bar{height:22px;position:relative}
+.eff .bar::before{content:"";position:absolute;right:0;top:-6px;bottom:-6px;width:2px;background:var(--rule)}
+.eff .b{position:absolute;top:0;height:22px;border-radius:4px}
+.eff .n{font-weight:600}
+.eff .n small{display:block;font-weight:400;color:var(--mute);font-size:15px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:44px}
+.cols h4{font-size:19px;font-weight:700;margin-bottom:12px}
+.cols p{font-size:17px;line-height:1.5;margin-bottom:10px;color:var(--ink)}
+.cols p span{color:var(--mute)}
+</style></head><body>
+
+<h1>От сырых валидаций до решения диспетчера</h1>
+<p class="lead">Каждая остановка на линии — модуль в репозитории. Зелёная показывает качество прогноза, красная — что в итоге получает диспетчер.</p>
+
+<div class="route"><div class="track"></div></div>
+<div class="stations">
+ <div class="st"><h3>Приём</h3><div class="v">62,4 млн</div>
+  <p class="c">валидаций свернули в почасовую таблицу за 17 секунд. С данными организаторов разошлись на 1 посадку.</p>
+  <p class="f">ml/aggregate_raw.py, DuckDB</p></div>
+ <div class="st"><h3>Признаки</h3><div class="v">4 источника</div>
+  <p class="c">Календарь и каникулы, погода по часам, ремонты маршрутов, остановки из OSM.</p>
+  <p class="f">ml/calendar.py, weather.py, route_events.py, geo.py</p></div>
+ <div class="st big win"><h3>Прогноз</h3><div class="v">0,883</div>
+  <p class="c">WAPE-score на лидерборде при бейзлайне 0,48. На бэктесте профильная модель обошла LightGBM и нейросеть.</p>
+  <p class="f">ml/model.py, ml/ml_compare.py</p></div>
+ <div class="st"><h3>API</h3><div class="v">0,4 мс</div>
+  <p class="c">на ответ: прогноз заранее разложен в массив, запрос берёт срез и умножает на коэффициенты.</p>
+  <p class="f">app/main.py, Swagger на /docs</p></div>
+ <div class="st big end"><h3>Диспетчер</h3>
+  <div class="decision" style="margin-top:14px"><span class="chip" style="background:#0078c8">26</span>12 ноября, 8:00</div>
+  <div class="v" style="margin-top:10px">+6 вагонов</div>
+  <p class="c">172 посадки на вагон при норме 120. Сервис подскажет, с какой ветки площадки их снять.</p>
+  <p class="f">React, MapLibre, карта Москвы</p></div>
+</div>
+
+<div class="bottom">
+ <div>
+  <h2>Что сдвигает посадки</h2>
+  <div class="eff"><div>Ремонт маршрута</div><div class="bar"><div class="b" style="right:0;width:95%;background:var(--warn)"></div></div><div class="n">−53% <small>№7, июль 2025</small></div></div>
+  <div class="eff"><div>Ливень больше 6 мм</div><div class="bar"><div class="b" style="right:0;width:18%;background:#f39200"></div></div><div class="n">−10% <small>за день</small></div></div>
+  <div class="eff"><div>Пробки 7–9 баллов</div><div class="bar"><div class="b" style="right:0;width:3px;background:var(--ink)"></div></div><div class="n">0% <small>проверили 16 дат</small></div></div>
+ </div>
+ <div class="cols">
+  <div><h4>Где модель точна</h4>
+   <p>9 маршрутов с данными, по часам.</p>
+   <p>1–2 месяца вперёд: <span>бэктест 0,85–0,92.</span></p>
+   <p>Год считается сценарно: <span>сезон видели только за 2025-й.</span></p></div>
+  <div><h4>Как перенести</h4>
+   <p>Новый период: <span>свежие данные, пересборка за 1 с.</span></p>
+   <p>Новый маршрут: <span>нужно 4 недели истории.</span></p>
+   <p>Новый ремонт: <span>одна запись в route_events.json.</span></p></div>
+ </div>
+</div>
+</body></html>

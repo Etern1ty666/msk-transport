@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1b1f2a;--mute:#5f6673;--faint:#9aa0aa;--rule:#e3e5e9;--line:#0078c8;--win:#00a661;--warn:#e03131;--paper:#fff;--zone:#fdecec}
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1600px;background:var(--paper);font-family:'Golos Text',system-ui,sans-serif;color:var(--ink);padding:72px 80px 64px}
+h1{font-size:52px;font-weight:700;letter-spacing:-.025em;line-height:1.05}
+.lead{font-size:21px;color:var(--mute);margin-top:14px;max-width:1000px;line-height:1.45}
+
+.scale{margin-top:60px}
+.scale h2{font-size:22px;font-weight:600;margin-bottom:22px}
+.axis{position:relative;height:84px}
+.base{position:absolute;left:0;right:0;top:62px;height:4px;background:var(--rule);border-radius:2px}
+.zone{position:absolute;top:48px;height:32px;border-radius:6px}
+.pin{position:absolute;top:0;transform:translateX(-50%);text-align:center}
+.pin b{display:block;font-size:44px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--win)}
+.pin i{display:block;width:28px;height:28px;border-radius:50%;background:#fff;border:7px solid var(--win);margin:4px auto 0}
+.ticks{position:relative;height:22px;margin-top:10px;color:var(--faint);font-size:15px}
+.ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.ticks span.req{color:var(--warn);font-weight:600}
+.note{font-size:17px;color:var(--mute);margin-top:16px}
+.note b{color:var(--ink);font-weight:600}
+
+.cond{display:flex;gap:64px;margin-top:52px;padding:26px 0;border-top:2px solid var(--rule);border-bottom:2px solid var(--rule)}
+.cond div{font-size:17px;color:var(--mute);line-height:1.4}
+.cond div b{display:block;font-size:30px;color:var(--ink);font-weight:700;letter-spacing:-.01em}
+
+.extra{margin-top:52px}
+.extra h2{font-size:30px;font-weight:700;letter-spacing:-.01em}
+.extra .lead{margin:8px 0 28px}
+.list{display:grid;grid-template-columns:1fr 1fr 1fr;column-gap:56px;row-gap:24px}
+.list p{font-size:17px;line-height:1.45;color:var(--mute);padding-left:26px;position:relative}
+.list p::before{content:"";position:absolute;left:0;top:6px;width:14px;height:14px;border-radius:50%;border:4px solid var(--faint);box-sizing:border-box}
+.list p b{display:block;color:var(--ink);font-weight:600;font-size:19px;margin-bottom:2px}
+.list p.top::before{border-color:var(--win);background:var(--win)}
+</style></head><body>
+
+<h1>Нагрузку держим с запасом в 4–6 раз</h1>
+<p class="lead">Кейс требует от одного контейнера сотни запросов в секунду при p95 до 200–300 мс. Мы гоняли backend в Docker с тем же лимитом, 2 vCPU и 2 ГБ, на случайных датах, маршрутах и коэффициентах, без кэша.</p>
+
+<div class="scale">
+ <h2>Задержка p95, миллисекунды. Красным — где требование кейса уже не выполняется</h2>
+ <div class="axis">
+  <div class="base"></div>
+  <div class="zone" style="left:50%;width:50%;background:linear-gradient(90deg,var(--zone),#f9c9c9)"></div>
+  <div class="pin" style="left:11.5%"><b>46</b><i></i></div>
+ </div>
+ <div class="ticks"><span style="left:0;transform:none">0</span><span style="left:25%">100</span><span class="req" style="left:50%">200</span><span class="req" style="left:75%">300</span><span style="left:100%;transform:translateX(-100%)">400</span></div>
+ <p class="note">С кэшем ответа <b>20 мс</b>, снимок карты на час <b>32 мс</b>, p99 на смешанной нагрузке <b>72 мс</b>.</p>
+</div>
+
+<div class="scale">
+ <h2>Запросов в секунду. Серым — «сотни RPS» из требования кейса</h2>
+ <div class="axis">
+  <div class="base"></div>
+  <div class="zone" style="left:2.5%;width:22.5%;background:#eceef1"></div>
+  <div class="pin" style="left:47%"><b>1 880</b><i></i></div>
+  <div class="pin" style="left:85.9%;top:12px"><b style="color:var(--ink);font-size:32px">3 436</b><i style="border-color:var(--ink);width:22px;height:22px;border-width:6px;margin-top:6px"></i></div>
+ </div>
+ <div class="ticks"><span style="left:0;transform:none">0</span><span style="left:25%">1 000</span><span style="left:50%">2 000</span><span style="left:75%">3 000</span><span style="left:100%;transform:translateX(-100%)">4 000</span></div>
+ <p class="note"><b>1 880</b> без кэша на смешанной нагрузке, <b>3 436</b> на повторяющихся запросах с кэшем. Ошибок ноль.</p>
+</div>
+
+<div class="cond">
+ <div><b>440 МБ</b>RAM весь тест, без swap</div>
+ <div><b>1 ядро из 2</b>занято, второе в запасе</div>
+ <div><b>1 секунда</b>сборка модели при старте</div>
+ <div><b>N реплик</b>состояния нет, ставятся за балансировщик</div>
+</div>
+
+<div class="extra">
+ <h2>Что сделали сверх задания</h2>
+ <p class="lead">Зелёным отмечено то, чем диспетчер пользуется каждый день.</p>
+ <div class="list">
+  <p class="top"><b>Откуда взять вагоны</b>Не просто «добавь 6», а с какой ветки или площадки их снять, чтобы не перегрузить её.</p>
+  <p class="top"><b>Где снять лишние</b>Ветки, где вагоны идут полупустыми, подсвечены на схеме.</p>
+  <p class="top"><b>Коэффициенты на лету</b>Погода, перекрытие, сезон: прогноз и карта меняются сразу.</p>
+  <p><b>Разбор прогноза</b>Видно, как профиль, тренд, календарь и погода дали итоговую цифру.</p>
+  <p><b>Честное сравнение с ML</b>LightGBM и нейросеть проверены на 18 окнах и проиграли, разбор в README.</p>
+  <p><b>Календарь ремонтов</b>Июльский ремонт №7 исключён из обучения: скор маршрута вырос с 0,70 до 0,86.</p>
+  <p><b>Проверка пробок</b>16 дат с 7–9 баллами: эффекта нет, поэтому в модель пробки не добавили.</p>
+  <p><b>Конвейер в реальном времени</b>9 стадий с логом, пересчёт из сырых 10 ГБ прямо из интерфейса.</p>
+  <p><b>Мониторинг и нагрузочный тест</b>RPS, p95, CPU и RAM вживую, тест запускается из браузера.</p>
+ </div>
+</div>
+</body></html>

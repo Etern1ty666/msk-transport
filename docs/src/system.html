@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1b1f2a;--mute:#5f6673;--faint:#9aa0aa;--rule:#e3e5e9;--line:#0078c8;--win:#00a661;--warn:#e03131;--paper:#fff;--soft:#f4f6f8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1600px;background:var(--paper);font-family:'Golos Text',system-ui,sans-serif;color:var(--ink);padding:72px 80px 64px}
+h1{font-size:52px;font-weight:700;letter-spacing:-.025em;line-height:1.05}
+.lead{font-size:21px;color:var(--mute);margin-top:14px;max-width:1000px;line-height:1.45}
+.canvas{position:relative;width:1440px;height:810px;margin-top:40px}
+.b{position:absolute;border-radius:14px;padding:16px 18px}
+.b h3{font-size:19px;font-weight:700;line-height:1.2}
+.b .t{font-size:13px;color:var(--mute);margin-top:2px}
+.b p{font-size:15px;line-height:1.45;margin-top:8px;color:var(--ink)}
+.b p span{color:var(--mute)}
+.box{background:#fff;border:2px solid var(--ink)}
+.inner{background:var(--soft);border:none}
+.cont{border:2px dashed var(--faint);background:transparent;border-radius:20px}
+.cont>.tag{position:absolute;top:-13px;left:18px;background:#fff;padding:0 8px;font-size:15px;font-weight:600;color:var(--mute)}
+.hot{background:#e8f4ec}
+.hot h3{color:#00864d}
+.data{background:#fff;border:2px solid var(--line)}
+.data h3{color:var(--line)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.chips span{font-size:14px;background:#fff;border:1.5px solid var(--rule);border-radius:8px;padding:4px 9px}
+svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.lbl{position:absolute;font-size:13.5px;color:var(--mute);background:#fff;padding:1px 6px;white-space:nowrap}
+</style></head><body>
+
+<h1>Как устроен сервис внутри</h1>
+<p class="lead">Два контейнера. Отдельной СУБД нет: история лежит в колоночных файлах Parquet, DuckDB читает сырые CSV, а готовый прогноз держится в памяти backend. Поэтому ответ приходит за доли миллисекунды.</p>
+
+<div class="canvas">
+ <svg width="1440" height="820" viewBox="0 0 1440 820">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1b1f2a"/></marker>
+  <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0078c8"/></marker></defs>
+  <g stroke="#1b1f2a" stroke-width="2.5" fill="none">
+   <path d="M202 250 H292" marker-end="url(#a)" marker-start="url(#a)"/>
+   <path d="M202 370 H292" marker-end="url(#a)" marker-start="url(#a)"/>
+   <path d="M486 180 H576" marker-end="url(#a)"/>
+   <path d="M486 240 H576" marker-end="url(#a)"/>
+   <path d="M735 272 V326" marker-end="url(#a)"/>
+   <path d="M1005 328 V274" marker-end="url(#a)"/>
+   <path d="M735 538 V484" marker-end="url(#a)"/>
+   <path d="M1005 538 V484" marker-end="url(#a)"/>
+  </g>
+  <g stroke="#0078c8" stroke-width="2.5" fill="none">
+   <path d="M1198 195 H1104" marker-end="url(#ab)" marker-start="url(#ab)"/>
+   <path d="M1198 415 H1150 V590 H1104" marker-end="url(#ab)"/>
+   <path d="M1198 660 H1104" marker-end="url(#ab)"/>
+  </g>
+ </svg>
+
+ <!-- браузер -->
+ <div class="b box" style="left:0;top:170px;width:200px;height:280px"><h3>Браузер диспетчера</h3>
+  <p>React 19, TypeScript</p><p>MapLibre: схема маршрутов на карте Москвы</p><p><span>Подложка карты грузится из OpenFreeMap</span></p></div>
+ <div class="lbl" style="left:222px;top:222px">HTTPS</div>
+ <div class="lbl" style="left:204px;top:338px">WebSocket</div>
+
+ <!-- nginx -->
+ <div class="b cont" style="left:280px;top:120px;width:220px;height:390px"><div class="tag">контейнер frontend</div></div>
+ <div class="b box" style="left:296px;top:170px;width:188px;height:280px"><h3>nginx</h3>
+  <p>Отдаёт собранный React</p><p>/api, /docs, /ws проксирует в backend</p><p><span>gzip, один домен на всё</span></p></div>
+
+ <!-- backend -->
+ <div class="b cont" style="left:560px;top:60px;width:560px;height:700px"><div class="tag">контейнер backend: Python 3.13, FastAPI, uvicorn · 2 vCPU, 2 ГБ</div></div>
+
+ <div class="b box" style="left:580px;top:120px;width:520px;height:150px"><h3>API</h3><div class="t">app/main.py</div>
+  <p>REST /api/forecast, /day, /recommendations, /export, WebSocket /ws/*</p>
+  <p><span>LRU-кэш ответов, orjson, gzip, понятные ошибки 400/409/503</span></p></div>
+
+ <div class="b hot" style="left:580px;top:330px;width:310px;height:152px"><h3>Прогноз в памяти</h3><div class="t">app/store.py</div>
+  <p>Массив 10 маршрутов × 365 дней × 24 часа по каждой компоненте</p>
+  <p><span>Ответ на запрос за 0,4 мс</span></p></div>
+
+ <div class="b inner" style="left:910px;top:330px;width:190px;height:152px"><h3>Шина событий</h3><div class="t">app/events.py</div>
+  <p>Ход конвейера и метрики уходят в /ws</p></div>
+
+ <div class="b inner" style="left:580px;top:540px;width:520px;height:190px"><h3>Конвейер, 9 стадий</h3><div class="t">app/pipeline.py + app/ml/*. Запускается при старте, из UI или CLI</div>
+  <div class="chips"><span>приём</span><span>нормализация</span><span>внешние данные</span><span>геопривязка</span><span>признаки</span><span>бэктест</span><span>обучение</span><span>прогноз</span><span>экспорт</span></div>
+  <p style="margin-top:14px"><span>Модель: профиль × тренд × календарь × погода</span></p></div>
+
+ <div class="lbl" style="left:742px;top:288px">запрос</div>
+ <div class="lbl" style="left:1012px;top:290px">события</div>
+ <div class="lbl" style="left:742px;top:500px">готовый прогноз</div>
+ <div class="lbl" style="left:1012px;top:500px">прогресс</div>
+
+ <!-- данные -->
+ <div class="b data" style="left:1200px;top:120px;width:240px;height:150px"><h3>Volume state</h3>
+  <p>settings.json</p><p><span>настройки сервиса, переживают пересборку</span></p></div>
+ <div class="b data" style="left:1200px;top:330px;width:240px;height:170px"><h3>dataset/</h3>
+  <p>train.csv + test.csv, 10 ГБ</p><p><span>необязательно, только чтение. DuckDB сворачивает за 17 с</span></p></div>
+ <div class="b data" style="left:1200px;top:540px;width:240px;height:190px"><h3>Файлы в образе</h3>
+  <p>raw_hourly.parquet, 0,9 МБ</p><p><span>погода, OSM, ремонты в JSON. Модель из них собирается за 1 с</span></p></div>
+</div>
+</body></html>
