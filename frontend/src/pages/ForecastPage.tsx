@@ -23,7 +23,8 @@ export default function ForecastPage() {
     route: routes.join(',') || undefined, stop_id: stop || undefined, hour_from: h0, hour_to: h1,
     agg: agg || undefined, ...coef,
   }
-  const fc = useApi<Forecast>('/api/forecast', { ...params, by_route: byRoute && !stop, v: version })
+  const view = { ...params, by_route: byRoute && !stop }
+  const fc = useApi<Forecast>('/api/forecast', { ...view, v: version })
   const keys = useMemo(() => byRoute && !stop ? Object.keys(fc.data?.by_route ?? {}).filter((k) => (fc.data?.by_route[k] ?? 0) > 0) : ['total'], [fc.data, byRoute, stop])
 
   return (
@@ -77,8 +78,8 @@ export default function ForecastPage() {
             <label className="forecast-check"><input type="checkbox" checked={byRoute} onChange={(e) => setByRoute(e.target.checked)} /> По маршрутам</label>
           </div>
           <div className="forecast-downloads">
-            <a className="btn primary" href={exportUrl({ ...params, format: 'csv' })} download><Download size={18} /> Скачать CSV</a>
-            <a className="btn primary" href={exportUrl({ ...params, format: 'xlsx' })} download><Download size={18} /> Скачать XLSX</a>
+            <a className="btn primary" href={exportUrl({ ...view, format: 'csv' })} download><Download size={18} /> Скачать CSV</a>
+            <a className="btn primary" href={exportUrl({ ...view, format: 'xlsx' })} download><Download size={18} /> Скачать XLSX</a>
             <a className="btn forecast-submission-link" href="/api/submission" download><Download size={16} /> submission.csv</a>
           </div>
         </div>

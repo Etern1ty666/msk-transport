@@ -180,9 +180,11 @@ def export(
     format: str = "csv", horizon: str = "day", date: str | None = None, month: str | None = None,
     date_from: str | None = None, date_to: str | None = None, route: str | None = None,
     stop_id: str | None = None, hour_from: int = 0, hour_to: int = 23,
+    agg: str | None = Q(None, description="hour | day | month | hour_of_day | weekday — как на графике"),
+    by_route: bool = Q(False, description="Столбец на каждый маршрут"),
     weather: float | None = None, event: float | None = None, season: float | None = None, trend: float | None = None, holiday: float | None = None,
 ):
-    q = _query(horizon, date, month, date_from, date_to, route, stop_id, hour_from, hour_to, None, False,
+    q = _query(horizon, date, month, date_from, date_to, route, stop_id, hour_from, hour_to, agg, by_route,
                weather, event, season, trend, holiday)
     body, ctype, name = store().export(q, format)
     return Response(body, media_type=ctype, headers={"Content-Disposition": f'attachment; filename="{name}"'})

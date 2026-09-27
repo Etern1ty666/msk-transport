@@ -24,8 +24,9 @@ HORIZONS = {
     "month": {"title": "Месяц", "agg": "day", "desc": "Среднесрочный: календарный месяц по дням"},
     "year": {"title": "Год", "agg": "month", "desc": "Долгосрочный (сценарный): 12 месяцев от точки прогноза"},
 }
+AGG_TITLES = {"hour": "Час", "day": "Дата", "month": "Месяц", "hour_of_day": "Час суток", "weekday": "День недели"}
 
-LOAD_LEVELS = [(0.7, "low", "свободно"), (1.0, "mid", "норма"), (1.2, "high", "внимание"), (math.inf, "crit", "перегрузка")]
+LOAD_LEVELS =[(0.7, "low", "свободно"), (1.0, "mid", "норма"), (1.2, "high", "внимание"), (math.inf, "crit", "перегрузка")]
 
 
 class QueryError(ValueError):
@@ -211,25 +212,33 @@ class Store:
         }
 
     def export(self, q: Query, fmt: str) -> tuple[bytes, str, str]:
-        df, _, stop_name = self.select(q)
-        out = df[["route", "date", "hour", "day_type", "base", "trend_mult", "cal_mult", "weather_mult",
-                  "season_mult", "yhat"]].copy()
-        out["date"] = out.date.dt.strftime("%Y-%m-%d")
-        out["prediction"] = np.round(out.pop("yhat")).astype(int)
-        if stop_name:
-            out.insert(1, "stop", stop_name)
-        out = out.round(4)
-        name = f"forecast_{q.horizon}_{out.date.min() if len(out) else ''}_{out.date.max() if len(out) else ''}"
+        """Выгрузка того же, что на графике: агрегация и разбивка по маршрутам из запроса.
+        В XLSX вторым листом — почасовые строки с множителями модели."""
+        if fmt not in ("csv", "xlsx"):
+            raise QueryError("format должен быть csv или xlsx")
+        fc = self.forecast(q)
+        routes = [r for r, v in fc["by_route"].items() if v > 0] if q.by_route else []  # как на графике: без пустых маршрутов
+        out = pd.DataFrame({AGG_TITLES[fc["agg"]]: [p["t"] for p in fc["series"]]})
+        if fc["stop"]:
+            out.insert(0, "Остановка", fc["stop"])
+        for r in routes:
+            out[f"№{r}"] = [int(round(p[r])) for p in fc["series"]]
+        out["Итого"] = [int(round(p["total"])) for p in fc["series"]]
+        name = f"forecast_{q.horizon}_{fc['agg']}_{fc['date_from']}_{fc['date_to']}"
         if fmt == "csv":
             return out.to_csv(sep=";", index=False).encode("utf-8-sig"), "text/csv; charset=utf-8", name + ".csv"
-        if fmt == "xlsx":
-            buf = io.BytesIO()
-            with pd.ExcelWriter(buf, engine="openpyxl") as w:
-                out.to_excel(w, sheet_name="Прогноз", index=False)
-                agg = out.groupby(["route", "date"]).prediction.sum().reset_index()
-                agg.to_excel(w, sheet_name="По дням", index=False)
-            return buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", name + ".xlsx"
-        raise QueryError("format должен быть csv или xlsx")
+        df, _, stop_name = self.select(q)
+        det = df[["route", "date", "hour", "day_type", "base", "trend_mult", "cal_mult", "weather_mult",
+                  "season_mult", "yhat"]].copy()
+        det["date"] = det.date.dt.strftime("%Y-%m-%d")
+        det["prediction"] = np.round(det.pop("yhat")).astype(int)
+        if stop_name:
+            det.insert(1, "stop", stop_name)
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as w:
+            out.to_excel(w, sheet_name="Прогноз", index=False)
+            det.round(4).to_excel(w, sheet_name="Почасовые детали", index=False)
+        return buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", name + ".xlsx"
 
     # ---------- история ----------
     def history(self, routes: tuple[int, ...], date_from: str | None, date_to: str | None, agg: str) -> dict:
