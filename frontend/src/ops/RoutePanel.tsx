@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, ArrowDownWideNarrow, ArrowLeftRight, Banknote, ChevronRight, Clock, EllipsisVertical, FileSpreadsheet, ListOrdered, Search, ShieldCheck, TrendingUp, TriangleAlert, User, Users, X } from 'lucide-react'
+import { ArrowLeft, ArrowDownWideNarrow, ArrowLeftRight, RussianRuble, ChevronRight, Clock, EllipsisVertical, FileSpreadsheet, ListOrdered, Search, ShieldCheck, TrendingUp, TriangleAlert, User, Users, X } from 'lucide-react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
-import { exportUrl, fmt, LEVEL_COLORS, LEVEL_TITLE, levelOf, problemWindows, SOFT, softExtra, freeWindow, type DayRoute, type Depot, type RouteGeo, type Stop } from '../api'
+import { exportUrl, fmt, LEVEL_COLORS, LEVEL_TITLE, levelOf, problemWindows, TH, softExtra, freeWindow, type DayRoute, type Depot, type RouteGeo, type Stop } from '../api'
 import { axis, tooltipStyle, useApp } from '../components'
 import Fleet, { FleetCalm, FreeFleet, TramSide } from './Fleet'
 import { hspan, Stat } from './Glyphs'
@@ -319,7 +319,7 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
           <div className="facts glyph-facts">
             <Stat big icon={Users} v={fmt(vals[hour])} on={tile === 'now'} onClick={tap('now')}
               tip={`${fmt(vals[hour])} посадок на остановке в ${hh(hour)} — нажмите, чтобы раскрыть`} />
-            <Stat big icon={Banknote} v={<LiveSum vals={vals} timeRef={timeRef} />} on={tile === 'pay'} onClick={tap('pay')}
+            <Stat big icon={RussianRuble} v={<LiveSum vals={vals} timeRef={timeRef} />} on={tile === 'pay'} onClick={tap('pay')}
               tip="Успешных оплат на остановке с 00:00 до времени на ленте (прогноз; одна успешная валидация = одна посадка) — нажмите, чтобы раскрыть" />
             <Stat big icon={TrendingUp} v={hh(peak)} on={tile === 'veh'} onClick={tap('veh')}
               tip={`Час пик на остановке: ${fmt(vals[peak])} посадок — нажмите, чтобы раскрыть`} />
@@ -384,7 +384,7 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
   const next = wins.find((w) => w.from > hour)
   // блок переброски виден всегда: сначала то, что актуально сейчас (перегрузка / выше 80% — сейчас или через час, иначе можно снять),
   // затем ближайшее впереди по суткам; если ничего — спокойная карточка
-  const sws = problemWindows(r, SOFT)
+  const sws = problemWindows(r, TH.soft)
   const trimSoft = (sw: { from: number; to: number }) => {
     const to = next && next.from <= sw.to ? next.from - 1 : sw.to // выше 80% — только до первого часа перегрузки
     if (to < sw.from) return null
@@ -415,7 +415,7 @@ export default function RoutePanel({ route: r, geo, allGeo, list, depots, date, 
         <div className="facts-box" data-tab={tile ? { now: 0, pay: 1, veh: 2 }[tile] : undefined}>
         <div className="facts glyph-facts">
           <Stat big icon={Users} v={fmt(r.boardings[hour])} on={tile === 'now'} onClick={tap('now')} tip={`Посадок в ${hh(hour)} — нажмите, чтобы раскрыть`} />
-          <Stat big icon={Banknote} v={<LiveSum vals={r.boardings} timeRef={timeRef} />} on={tile === 'pay'} onClick={tap('pay')}
+          <Stat big icon={RussianRuble} v={<LiveSum vals={r.boardings} timeRef={timeRef} />} on={tile === 'pay'} onClick={tap('pay')}
             tip="Успешных оплат с 00:00 до времени на ленте (прогноз; одна успешная валидация = одна посадка) — нажмите, чтобы раскрыть" />
           <Stat big icon={TramSide} v={on ? Math.floor(r.vehicles[hour]) : 0} on={tile === 'veh'} onClick={tap('veh')} tip={`Вагонов на линии в ${hh(hour)} — нажмите, чтобы раскрыть`} />
         </div>

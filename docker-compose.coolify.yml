@@ -9,6 +9,10 @@ services:
     environment:
       DATASET_DIR: /dataset
       DATA_DIR: /app/data
+      SETTINGS_PATH: /app/state/settings.json
+    volumes:
+      # настройки со страницы «Настройки» — переживают передеплой
+      - state:/app/state
     expose:
       - "8000"
     restart: unless-stopped
@@ -25,3 +29,6 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  state:

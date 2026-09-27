@@ -4,9 +4,12 @@ services:
     build: { context: ., dockerfile: backend/Dockerfile }
     environment:
       DATASET_DIR: /dataset
+      SETTINGS_PATH: /app/state/settings.json
     volumes:
       # папка распакованного dataset.zip (labels/, spravochniki/, train.csv, test.csv)
       - ${DATASET_DIR:-../dataset}:/dataset:ro
+      # настройки со страницы «Настройки» — переживают пересборку контейнера
+      - state:/app/state
     ports: ["8000:8000"]
     deploy:
       resources:
@@ -18,3 +21,6 @@ services:
     depends_on:
       backend: { condition: service_healthy }
     restart: unless-stopped
+
+volumes:
+  state:

@@ -13,6 +13,7 @@ from app.config import DATA_DIR
 from app.ml import calendar as C
 from app.ml import depots as DEP
 from app.ml import paymix as PAY
+from app import settings as SET
 from app.ml import geo as G
 from app.ml.model import ROUTES, Coefficients
 from app.ml.weather import SOURCE as WEATHER_SOURCE
@@ -75,10 +76,16 @@ class Store:
         self.day_keys = np.array([f"{d:%Y-%m-%d}" for d in self.days])
         self.month_keys = np.array([f"{d:%Y-%m}" for d in self.days])
         self.dow = self.days.dayofweek.to_numpy()
-        self.target = np.array([self.art.bpv_target.get(r, 110.0) for r in ROUTES])
+        self.routes = list(ROUTES)
+        self.target_base = np.array([self.art.bpv_target.get(r, 110.0) for r in ROUTES])
         self.depots = DEP.load()  # площадки и выпуск вагонов (data/depots.json)
         self.paymix = PAY.load()  # доли типов оплаты по маршруту и часу (data/paymix.json)
         self._ycache: dict[tuple, np.ndarray] = {}
+
+    @property
+    def target(self) -> np.ndarray:
+        """Норматив посадок на вагон с учётом множителя из настроек сервиса."""
+        return self.target_base * SET.get().norm_scale
 
     def yhat_tensor(self, coef: Coefficients) -> np.ndarray:
         key = (coef.weather, coef.event, coef.season, coef.trend, coef.holiday, PARAMS.scale)

@@ -2,7 +2,7 @@ import { Download, Thermometer } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { exportUrl, fmt, useApi, type Forecast } from '../api'
-import { axis, Card, CoefPanel, ErrorBox, Kpi, RouteChips, routeColor, tooltipStyle, useApp } from '../components'
+import { axis, Card, SettingsHint, ErrorBox, Kpi, RouteChips, routeColor, tooltipStyle, useApp } from '../components'
 
 type Decomp = {
   route: number; date: string; day_type: string; special: string; school_holiday: boolean
@@ -116,7 +116,7 @@ export default function ForecastPage() {
             </AreaChart>
           </ResponsiveContainer>
         </Card>
-        <CoefPanel />
+        <SettingsHint />
       </div>
 
       <div className="grid g2">

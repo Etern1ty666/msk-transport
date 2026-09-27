@@ -18,9 +18,57 @@ export const SCHEME_ROUTES = Object.fromEntries(SCHEME.routes.map((r) => [r.num,
 const LANE: number = (raw as { lane?: number }).lane ?? 3.8 // шаг полос в пучке (подобран по эталону)
 const STROKE = LANE * 0.92 // толщина линии: полосы пучка идут почти вплотную, как на оригинале
 const BOX = { x: 30, y: 90, w: 1400, h: 1590 } // рамка всей сети — дальше отдалять и уводить нельзя
+const IDENT = 'translate(0px,0px)' // «нет сдвига» без переключения transform ↔ none: такое переключение заставляло пересчитывать раскладку схемы
+const OVER = 400 // SVG схемы шире экрана на столько px с каждой стороны: при перетаскивании края не пустеют до перерисовки
 const HOME_WIDE = { x: 250, y: 300, w: 950, h: 820 } // стартовый вид: центр сети крупнее, края — прокруткой
 const HOME_PHONE = { x: 430, y: 380, w: 620, h: 720 }
 const homeBox = () => (typeof window !== 'undefined' && window.innerWidth <= 720 ? HOME_PHONE : HOME_WIDE)
+
+// ---------------------------------------------------------------- ориентиры (как на официальной схеме)
+// подписи парков и лесов — внутри их полигонов, в точке, дальше всего отстоящей от линий и остановок (подобрано скриптом по scheme.json)
+const PARKS: { t: string[]; p: Pt }[] = [
+  { t: ["ЛОСИНЫЙ", "ОСТРОВ"], p: [1105, 185] },
+  { t: ["БОТАНИЧЕСКИЙ", "САД"], p: [696, 269] },
+  { t: ["СОКОЛЬНИКИ"], p: [788, 549] },
+  { t: ["ЛЕСОПАРК", "ИЗМАЙЛОВО"], p: [1350, 553] },
+  { t: ["ПАРК", "КРЫЛАТСКИЕ", "ХОЛМЫ"], p: [263, 824] },
+  { t: ["ДОЛИНА", "РЕКИ", "СЕТУНЬ"], p: [300, 1045] },
+  { t: ["ПАРК", "КУЗЬМИНКИ"], p: [1265, 1179] },
+  { t: ["ТЁПЛЫЙ", "СТАН"], p: [292, 1384] },
+  { t: ["БИТЦЕВСКИЙ", "ЛЕС"], p: [524, 1553] },
+  { t: ["БИРЮЛЁВСКИЙ", "ЛЕСОПАРК"], p: [926, 1641] },
+]
+const KREMLIN: Pt = [699, 835] // левее линии у «Комиссариатского моста», как на эталоне
+// здания-достопримечательности — пиктограммы «домиками», как на официальной схеме; точка — низ здания,
+// место рядом с остановкой подобрано скриптом так, чтобы не задевать линии, остановки и подписи парков
+type LmKind = 'tower' | 'arch' | 'mgu' | 'station' | 'fort' | 'tent' | 'gallery' | 'cathedral'
+const LANDMARKS: { k: LmKind; n: string; p: Pt }[] = [
+  { k: 'tower', n: 'Останкинская телебашня', p: [706, 428] },
+  { k: 'arch', n: 'ВДНХ', p: [748, 385] },
+  { k: 'mgu', n: 'МГУ', p: [336, 1172] },
+  { k: 'station', n: 'Белорусский вокзал', p: [484, 700] },
+  { k: 'station', n: 'Курский вокзал', p: [823, 831] },
+  { k: 'station', n: 'Павелецкий вокзал', p: [770, 988] },
+  { k: 'fort', n: 'Измайловский кремль', p: [1051, 557] },
+  { k: 'tent', n: 'Коломенское', p: [805, 1268] },
+  { k: 'gallery', n: 'Третьяковская галерея', p: [770, 914] },
+  { k: 'cathedral', n: 'Храм Христа Спасителя', p: [655, 880] },
+]
+/** Пиктограммы зданий (низ по центру в 0,0, высота ~24). */
+function Building({ k }: { k: LmKind | 'kremlin' }) {
+  switch (k) {
+    case 'tower': return <><path className="b" d="M-4 0 L-1 -8 H1 L4 0 Z" /><rect className="b" x={-0.9} y={-25} width={1.8} height={17} /><rect className="d" x={-2.4} y={-16} width={4.8} height={2.4} rx={0.6} /><path className="d" d="M0 -25 V-30" /></>
+    case 'arch': return <><path className="b" d="M-11 0 V-12 H11 V0 H7 V-7 A7 7 0 0 0 -7 -7 V0 Z" /><path className="d" d="M-11 -12 H11 M-8 -12 V-4 M8 -12 V-4" /><path className="b" d="M-2.5 -12 L-1.5 -19 H1.5 L2.5 -12 Z" /></>
+    case 'mgu': return <><rect className="b" x={-11} y={-8} width={7} height={8} /><rect className="b" x={4} y={-8} width={7} height={8} /><path className="b" d="M-9 -8 V-11 H-6 V-8 M6 -8 V-11 H9 V-8" /><path className="b" d="M-4 0 V-14 H-2.5 V-18 H2.5 V-14 H4 V0 Z" /><path className="d" d="M-1.5 -18 L0 -24 L1.5 -18 M0 -24 V-28" /></>
+    case 'station': return <><path className="b" d="M-11 0 V-8 H-5 V-11 H5 V-8 H11 V0 Z" /><path className="b" d="M-2.5 -11 V-16 L0 -19 L2.5 -16 V-11" /><path className="d" d="M-9 -4 H-6 M-3 -6 V-2 M0 -6 V-2 M3 -6 V-2 M6 -4 H9" /></>
+    case 'fort': return <><path className="b" d="M-10 0 V-9 L-7.5 -15 L-5 -9 V-6 H5 V-9 L7.5 -15 L10 -9 V0 Z" /><path className="b" d="M-2.5 -6 V-12 L0 -20 L2.5 -12 V-6" /><path className="d" d="M-10 -9 H-5 M5 -9 H10 M-2.5 -12 H2.5" /></>
+    case 'tent': return <><path className="b" d="M-6 0 V-6 H-4 V-10 H4 V-6 H6 V0 Z" /><path className="b" d="M-3 -10 L0 -24 L3 -10 Z" /><path className="d" d="M0 -24 V-28 M-1.3 -26.5 H1.3 M-3 -10 H3" /></>
+    case 'gallery': return <><path className="b" d="M-10 0 V-9 L0 -15 L10 -9 V0 Z" /><path className="d" d="M-10 -9 H10 M-2 0 V-5 H2 V0 M-7 -3 H-4 M4 -3 H7" /><circle className="d" cx={0} cy={-11.5} r={1.2} /></>
+    case 'cathedral': return <><rect className="b" x={-9} y={-9} width={18} height={9} /><rect className="b" x={-4.5} y={-13} width={9} height={4} /><path className="gold" d="M-4.5 -13 Q-4.5 -20 0 -20 Q4.5 -20 4.5 -13 Z" /><path className="gold" d="M-8.5 -9 Q-8.5 -12.5 -6.5 -12.5 Q-4.5 -12.5 -4.5 -9 Z M4.5 -9 Q4.5 -12.5 6.5 -12.5 Q8.5 -12.5 8.5 -9 Z" /><path className="d" d="M0 -20 V-24 M-1.3 -22.5 H1.3" /></>
+    case 'kremlin': return <><path className="brick" d="M-12 0 V-5 H-11 V-6.5 H-9.5 V-5 H-8 V-6.5 H-6.5 V-5 H-4.5 V0 Z M12 0 V-5 H11 V-6.5 H9.5 V-5 H8 V-6.5 H6.5 V-5 H4.5 V0 Z" /><rect className="brick" x={-4.5} y={-12} width={9} height={12} /><rect className="brick" x={-3.3} y={-17} width={6.6} height={5} /><path className="brick" d="M-3.3 -17 L0 -26 L3.3 -17 Z" /><circle className="clock" cx={0} cy={-14.5} r={1.5} /><polygon className="star" points="0,-31 1,-28.4 3.7,-28.4 1.5,-26.8 2.3,-24.2 0,-25.8 -2.3,-24.2 -1.5,-26.8 -3.7,-28.4 -1,-28.4" /></>
+  }
+}
+const RIVER = { p: [431, 949] as Pt, a: -43 } // вдоль русла Москвы-реки к западу от центра
 
 // ---------------------------------------------------------------- геометрия
 const sub = (a: Pt, b: Pt): Pt => [a[0] - b[0], a[1] - b[1]]
@@ -380,6 +428,18 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
   const t = useRef({ x: 0, y: 0, k: 0.5 })
   // вид, с которым последний раз рисовались холсты: между кадрами живого слоя они сдвигаются CSS-трансформом (без перерисовки)
   const drawnT = useRef<{ x: number; y: number; k: number } | null>(null)
+  const svgBg = useRef<HTMLDivElement>(null) // обёртки SVG: CSS-трансформ на HTML-слое не трогает раскладку SVG
+  const svgFg = useRef<HTMLDivElement>(null)
+  const svgT = useRef<{ x: number; y: number; k: number } | null>(null) // трансформ, с которым SVG нарисован
+  const commitTimer = useRef(0)
+  // пока схема едет под курсором, браузер шлёт pointerenter линиям под ним: подсветка при наведении на время жеста выключена,
+  // иначе каждое такое событие перерисовывает React и пересчитывает стили всей схемы
+  const movedAt = useRef(-1e9)
+  const hoverOk = (e: React.PointerEvent) => e.pointerType === 'mouse' && !e.buttons && performance.now() - movedAt.current > 250
+  // размер и положение контейнера: читаем при ресайзе и в начале жеста, а не на каждое событие —
+  // чтение после записи трансформов заставляло браузер пересчитывать раскладку на каждое движение мыши
+  const vp = useRef({ w: 1, h: 1, left: 0, top: 0 })
+  const measure = () => { const el = box.current; if (!el) return; const r = el.getBoundingClientRect(); vp.current = { w: el.clientWidth, h: el.clientHeight, left: r.left, top: r.top } }
   const [hover, setHover] = useState<string | null>(null)
   const [zoomCls, setZoomCls] = useState('z0')
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
@@ -486,13 +546,14 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
   const clamp = () => {
     const el = box.current
     if (!el) return
-    const p = padRef.current, W = el.clientWidth, H = el.clientHeight
+    const p = padRef.current, W = vp.current.w, H = vp.current.h
     const c = t.current
     c.k = Math.max(minK(), Math.min(8, c.k))
-    // край сети не уходит дальше края видимой области (небольшой запас); если сеть меньше экрана — по центру
+    // край сети не уходит дальше края видимой области (небольшой запас); если сеть меньше экрана — её можно двигать
+    // в пределах видимой области (не прибита к центру), чтобы рассмотреть любой край
     const axis = (pos: number, b0: number, bw: number, v0: number, v1: number) => {
       const lo = pos + b0 * c.k, size = bw * c.k, slack = 48
-      if (size <= v1 - v0) return pos + ((v0 + v1) / 2 - (lo + size / 2))
+      if (size <= v1 - v0) return pos + (Math.max(v0 - slack, Math.min(v1 - size + slack, lo)) - lo)
       if (lo > v0 + slack) return pos - (lo - v0 - slack)
       if (lo + size < v1 - slack) return pos + (v1 - slack - lo - size)
       return pos
@@ -500,38 +561,68 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
     c.x = axis(c.x, BOX.x, BOX.w, p.left, W - p.right)
     c.y = axis(c.y, BOX.y, BOX.h, p.top, H - p.bottom)
   }
+  // SVG схемы (тысячи элементов) перерисовывается только здесь: трансформ групп и зависящие от масштаба толщины/размеры
+  const commit = () => {
+    window.clearTimeout(commitTimer.current)
+    const { x, y, k } = t.current
+    const tr = `translate(${(x + OVER).toFixed(1)},${(y + OVER).toFixed(1)}) scale(${k.toFixed(4)})`
+    for (const gg of [gBg, gFg]) if (gg.current && gg.current.getAttribute('transform') !== tr) gg.current.setAttribute('transform', tr)
+    for (const s of [svgBg, svgFg]) if (s.current) s.current.style.transform = IDENT
+    svgT.current = { x, y, k }
+    const el = box.current
+    if (!el) return
+    const vars: [string, string][] = [
+      ['--sw', String(strokeOf(k))],
+      ['--hw', String(Math.max(LANE, 10 / k))],
+      // остановки выбранной ветки не мельче ~4 px (зона нажатия ~11 px) при любом отдалении — по ним легко попасть
+      ['--ds', (Math.max(1, 4.5 / (1.05 * k))).toFixed(3)],
+      ['--hs', (Math.max(1, 11 / (LANE * 0.5 * k))).toFixed(3)],
+      // номера веток на конечных — не уже ~16 px на экране; подписи ориентиров — не мельче ~10 px
+      ['--ts', (Math.max(1, 16 / (11 * k))).toFixed(3)],
+      ['--ls', (Math.max(1, 8 / (11 * k))).toFixed(3)],
+    ]
+    for (const [n, v] of vars) if (el.style.getPropertyValue(n) !== v) el.style.setProperty(n, v)
+    const z = k < 0.9 ? 'z0' : k < 1.8 ? 'z1' : 'z2'
+    setZoomCls((q) => (q === z ? q : z))
+  }
   const apply = () => {
     clamp()
     const { x, y, k } = t.current
-    const tr = `translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${k.toFixed(4)})`
-    for (const gg of [gBg, gFg]) gg.current?.setAttribute('transform', tr)
+    // во время жеста уже нарисованная схема едет и масштабируется CSS-трансформом (работа композитора, без перерисовки);
+    // настоящий трансформ — когда жест затих, или сразу, если сильно приблизили или вот-вот покажется край запаса
+    const st = svgT.current, el = box.current
+    if (!st || !el) commit()
+    else {
+      const s = k / st.k, tx = x + OVER - s * (st.x + OVER), ty = y + OVER - s * (st.y + OVER)
+      const L = tx - OVER, T = ty - OVER, R = L + s * (vp.current.w + 2 * OVER), B = T + s * (vp.current.h + 2 * OVER)
+      if (s > 1.5 || s < 0.67 || L > 0 || T > 0 || R < vp.current.w || B < vp.current.h) commit()
+      else if (s !== 1 || Math.abs(tx) > 0.01 || Math.abs(ty) > 0.01) {
+        const css = `translate(${tx.toFixed(2)}px,${ty.toFixed(2)}px) scale(${s.toFixed(5)})`
+        for (const sv of [svgBg, svgFg]) if (sv.current) sv.current.style.transform = css
+        window.clearTimeout(commitTimer.current)
+        commitTimer.current = window.setTimeout(commit, 150)
+      }
+    }
     const dt = drawnT.current
-    const ct = dt ? `translate(${(x - dt.x * (k / dt.k)).toFixed(2)}px,${(y - dt.y * (k / dt.k)).toFixed(2)}px) scale(${(k / dt.k).toFixed(5)})` : ''
+    const ct = dt ? `translate(${(x - dt.x * (k / dt.k)).toFixed(2)}px,${(y - dt.y * (k / dt.k)).toFixed(2)}px) scale(${(k / dt.k).toFixed(5)})` : IDENT
     for (const c of [glowCv.current, fxCv.current]) if (c) c.style.transform = ct
-    const el = box.current
-    el?.style.setProperty('--sw', String(strokeOf(k)))
-    el?.style.setProperty('--hw', String(Math.max(LANE, 10 / k)))
-    // остановки выбранной ветки не мельче ~4 px (зона нажатия ~11 px) при любом отдалении — по ним легко попасть
-    el?.style.setProperty('--ds', (Math.max(1, 4.5 / (1.05 * k))).toFixed(3))
-    el?.style.setProperty('--hs', (Math.max(1, 11 / (LANE * 0.5 * k))).toFixed(3))
     const p = pinAt.current
     if (pin.current && p) {
       pin.current.style.transform = `translate(${(p[0] * k + x).toFixed(1)}px,${(p[1] * k + y).toFixed(1)}px)`
       pin.current.style.setProperty('--pin-off', `${(pinR.current * k + 10).toFixed(0)}px`)
     }
-    const z = k < 0.9 ? 'z0' : k < 1.8 ? 'z1' : 'z2'
-    setZoomCls((q) => (q === z ? q : z))
   }
   const fitBox = (bx: { x: number; y: number; w: number; h: number }, maxK = 6) => {
     const el = box.current
     if (!el) return t.current
-    const W = el.clientWidth, H = el.clientHeight, p = padRef.current
+    const W = vp.current.w, H = vp.current.h, p = padRef.current
     const k = Math.min(maxK, (W - p.left - p.right) / bx.w, (H - p.top - p.bottom) / bx.h)
     return { k, x: p.left + (W - p.left - p.right - bx.w * k) / 2 - bx.x * k, y: p.top + (H - p.top - p.bottom - bx.h * k) / 2 - bx.y * k }
   }
   const sizeCanvas = () => {
     const el = box.current
     if (!el) return
+    measure()
     // свечение мягкое — ему хватает разрешения CSS-пикселей (на retina в 4 раза меньше работы видеокарте); трамваям и кольцам — чёткость
     const dpr = Math.min(2, window.devicePixelRatio || 1)
     for (const [c, sc] of [[glowCv.current, Math.min(1, dpr)], [fxCv.current, dpr]] as const) {
@@ -548,6 +639,7 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
       // масштаб интерполируем в логарифме — ощущается равномерно
       const k = Math.exp(Math.log(from.k) + (Math.log(to.k) - Math.log(from.k)) * q)
       t.current = { k, x: from.x + (to.x - from.x) * q, y: from.y + (to.y - from.y) * q }
+      movedAt.current = now
       apply()
       if (e < 1) anim.current = requestAnimationFrame(step)
     }
@@ -562,8 +654,7 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
 
   useImperativeHandle(ref, () => ({
     zoom: (d) => {
-      const el = box.current!
-      const { x, y, k } = t.current, k2 = Math.max(minK(), Math.min(8, k * (d > 0 ? 1.6 : 1 / 1.6))), cx = el.clientWidth / 2, cy = el.clientHeight / 2
+      const { x, y, k } = t.current, k2 = Math.max(minK(), Math.min(8, k * (d > 0 ? 1.6 : 1 / 1.6))), cx = vp.current.w / 2, cy = vp.current.h / 2
       animateTo({ k: k2, x: cx - (cx - x) * (k2 / k), y: cy - (cy - y) * (k2 / k) }, 300)
     },
     fit: () => animateTo(fitBox(homeBox())),
@@ -588,9 +679,9 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
     sizeCanvas()
     t.current = fitBox(homeBox())
     apply()
-    const ro = new ResizeObserver(() => { sizeCanvas(); if (!selectedRef.current) t.current = fitBox(homeBox()); apply() })
+    const ro = new ResizeObserver(() => { sizeCanvas(); if (!selectedRef.current) t.current = fitBox(homeBox()); apply(); commit() })
     if (box.current) ro.observe(box.current)
-    return () => ro.disconnect()
+    return () => { ro.disconnect(); window.clearTimeout(commitTimer.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const selectedRef = useRef(selected)
@@ -600,8 +691,7 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
   useEffect(() => {
     if (!debug) return
     ;(window as unknown as { __sch: (x: number, y: number, k: number) => void }).__sch = (x, y, k) => {
-      const el = box.current!
-      t.current = { k, x: el.clientWidth / 2 - x * k, y: el.clientHeight / 2 - y * k }
+      t.current = { k, x: vp.current.w / 2 - x * k, y: vp.current.h / 2 - y * k }
       apply()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -617,7 +707,7 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
     const el = box.current!
     const pts = new Map<number, { x: number; y: number }>()
     let moved = 0, pinch = 0
-    const down = (e: PointerEvent) => { cancelAnimationFrame(anim.current); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = 0; clearHover.current() }
+    const down = (e: PointerEvent) => { measure(); cancelAnimationFrame(anim.current); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = 0; clearHover.current() }
     const move = (e: PointerEvent) => {
       const p = pts.get(e.pointerId)
       if (!p) return
@@ -627,7 +717,7 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
         p.x = e.clientX; p.y = e.clientY
         const [a2, b2] = [...pts.values()]
         const d1 = Math.hypot(a2.x - b2.x, a2.y - b2.y)
-        const r = el.getBoundingClientRect()
+        const r = vp.current
         if (pinch && d0) zoomAt((a2.x + b2.x) / 2 - r.left, (a2.y + b2.y) / 2 - r.top, d1 / d0)
         pinch = 1
         moved += 10
@@ -638,13 +728,16 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
       moved += Math.abs(dx) + Math.abs(dy)
       if (moved > 4 && !el.hasPointerCapture(e.pointerId)) el.setPointerCapture(e.pointerId)
       t.current.x += dx; t.current.y += dy
+      movedAt.current = performance.now()
       apply()
     }
     const up = (e: PointerEvent) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = 0; if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId) }
     const wheel = (e: WheelEvent) => {
       e.preventDefault()
+      if (performance.now() - movedAt.current > 250) clearHover.current()
+      movedAt.current = performance.now()
       cancelAnimationFrame(anim.current)
-      const r = el.getBoundingClientRect()
+      const r = vp.current
       if (e.ctrlKey || (Math.abs(e.deltaY) > Math.abs(e.deltaX) * 1.5 && !e.shiftKey)) zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)))
       else { t.current.x -= e.deltaX; t.current.y -= e.deltaY; apply() }
     }
@@ -664,12 +757,13 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
       const route = target.closest('[data-route]')?.getAttribute('data-route')
       onSelectRef.current(route ?? null)
     }
-    const dbl = (e: MouseEvent) => { const r = el.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, 1.8) }
+    const dbl = (e: MouseEvent) => { const r = vp.current; zoomAt(e.clientX - r.left, e.clientY - r.top, 1.8) }
     const hoverMove = (e: PointerEvent) => { // подсказка следует за курсором (без перерисовки React)
-      const r = el.getBoundingClientRect()
+      const r = vp.current
       if (tip.current) tip.current.style.transform = `translate(${e.clientX - r.left + 14}px, ${e.clientY - r.top + 14}px)`
     }
     el.addEventListener('pointerdown', down)
+    el.addEventListener('pointerenter', measure)
     el.addEventListener('pointermove', move)
     el.addEventListener('pointermove', hoverMove)
     el.addEventListener('pointerup', up)
@@ -678,7 +772,7 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
     el.addEventListener('click', click)
     el.addEventListener('dblclick', dbl)
     return () => {
-      el.removeEventListener('pointerdown', down); el.removeEventListener('pointermove', move); el.removeEventListener('pointermove', hoverMove)
+      el.removeEventListener('pointerdown', down); el.removeEventListener('pointerenter', measure); el.removeEventListener('pointermove', move); el.removeEventListener('pointermove', hoverMove)
       el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.removeEventListener('wheel', wheel)
       el.removeEventListener('click', click); el.removeEventListener('dblclick', dbl)
     }
@@ -719,15 +813,14 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
     let raf = 0, seen: DayView | null = null, seenNodes: unknown = null, peak = 1, scan0 = -1e9, lastDraw = -1e9
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick)
-      // ~30 кадров в секунду, при перетаскивании/масштабе — ~60: плавности хватает, а видеокарта (особенно на 120 Гц) не греется.
+      // ~30 кадров в секунду и при перетаскивании/масштабе: плавности хватает, а видеокарта не греется (Safari на ноутбуке).
       // Между кадрами холсты «догоняют» схему CSS-трансформом в apply()
-      const T = t.current, dT = drawnT.current
-      const moved = !dT || dT.x !== T.x || dT.y !== T.y || dT.k !== T.k
-      if (now - lastDraw < (moved ? 15 : 32)) return
+      const T = t.current
+      if (now - lastDraw < 32) return
       lastDraw = now
       wipe()
       drawnT.current = { ...T }
-      gc.canvas.style.transform = fc.canvas.style.transform = ''
+      if (gc.canvas.style.transform !== IDENT) gc.canvas.style.transform = fc.canvas.style.transform = IDENT
       const L = live.current, d = L.day
       const el = box.current
       if (!d || !el) return
@@ -737,7 +830,7 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
         const byR = new Map(d.routes.map((r) => [String(r.route), r]))
         for (const n of L.nodes) for (const c of n.contrib) { const r = byR.get(c.r); if (r) peak = Math.max(peak, Math.max(...r.boardings) * c.w) }
       }
-      const W = fc.canvas.width, H = fc.canvas.height, dpr = W / Math.max(1, el.clientWidth)
+      const W = fc.canvas.width, H = fc.canvas.height, dpr = W / Math.max(1, vp.current.w)
       const gs = gc.canvas.width / Math.max(1, W) // свечение — в пониженном разрешении, координаты те же
       gc.setTransform(gs, 0, 0, gs, 0, 0)
       const { x, y, k } = T
@@ -970,10 +1063,10 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
         {/* невидимые широкие полосы для наведения/клика */}
         {lanes.map((l, i) => (
           <path key={`x${i}`} d={l.d} data-route={l.route} className="sch-hit"
-            onPointerEnter={(e) => { if (e.pointerType === 'mouse' && !e.buttons) setHover(l.route) }} onPointerLeave={() => setHover((h) => (h === l.route ? null : h))} />
+            onPointerEnter={(e) => { if (hoverOk(e)) setHover(l.route) }} onPointerLeave={() => setHover((h) => (h === l.route ? null : h))} />
         ))}
         {stops.map((s, i) => (
-          <g key={`s${i}`} data-stop={i} onPointerEnter={(e) => { if (e.pointerType === 'mouse' && !e.buttons) setHoverStop(i) }} onPointerLeave={() => setHoverStop((h) => (h === i ? null : h))}
+          <g key={`s${i}`} data-stop={i} onPointerEnter={(e) => { if (hoverOk(e)) setHoverStop(i) }} onPointerLeave={() => setHoverStop((h) => (h === i ? null : h))}
             className={`sch-stop ${rc(s.routes)}`}>
             {s.dots.map((d, j) => <circle key={j} className={`ln-${s.routes[j] ?? ''}`} cx={d[0]} cy={d[1]} r={1.05} />)}
             {/* своя зона нажатия у каждой точки: клик выбирает маршрут этой полосы и остановку */}
@@ -1004,13 +1097,17 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
           )
         })}
         {SCHEME.terms.map((tm, i) => (
-          <g key={`b${i}`} className={`sch-term ${tm.routes.map((r) => `sr-${r}`).join(' ')}`}>
-            {tm.routes.map((r, j) => (
-              <g key={r} data-route={r} transform={`translate(${tm.p[0] + j * 12},${tm.p[1]})`}>
-                <rect width={11} height={8} rx={1.4} fill={SCHEME_ROUTES[r]?.color ?? '#888'} />
-                <text x={5.5} y={6} textAnchor="middle">{r}</text>
-              </g>
-            ))}
+          <g key={`b${i}`} className={`sch-term ${tm.routes.map((r) => `sr-${r}`).join(' ')}`} transform={`translate(${tm.p[0]},${tm.p[1]})`}>
+            {/* при сильном отдалении ряд номеров увеличивается (--ts), чтобы ветки читались на всей схеме */}
+            <g className="sch-tscale">
+              {tm.routes.map((r, j) => (
+                <g key={r} data-route={r} transform={`translate(${j * 12},0)`}
+                  onPointerEnter={(e) => { if (hoverOk(e)) setHover(r) }} onPointerLeave={() => setHover((h) => (h === r ? null : h))}>
+                  <rect width={11} height={8} rx={1.4} fill={SCHEME_ROUTES[r]?.color ?? '#888'} />
+                  <text x={5.5} y={6} textAnchor="middle">{r}</text>
+                </g>
+              ))}
+            </g>
           </g>
         ))}
       </>
@@ -1025,6 +1122,19 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
       {bg?.parks.map((d, i) => <path key={`p${i}`} className="sch-park" d={d} />)}
       {bg?.white.map((d, i) => <path key={`w${i}`} className="sch-white" d={d} />)}
       {bg?.water.map((d, i) => <path key={`r${i}`} className="sch-river" d={d} />)}
+      {/* ориентиры: парки и леса, река, Кремль — под линиями маршрутов */}
+      {PARKS.map((pk) => (
+        <text key={pk.t.join(' ')} className="sch-lm park" x={pk.p[0]} y={pk.p[1] - ((pk.t.length - 1) * 13) / 2} textAnchor="middle">
+          {pk.t.map((line, j) => <tspan key={j} x={pk.p[0]} dy={j ? '1.15em' : '0.35em'}>{line}</tspan>)}
+        </text>
+      ))}
+      <text className="sch-lm river" transform={`translate(${RIVER.p[0]},${RIVER.p[1]}) rotate(${RIVER.a})`} textAnchor="middle">р. Москва</text>
+      {LANDMARKS.map((b) => (
+        <g key={b.n} className="sch-bld" transform={`translate(${b.p[0]},${b.p[1]})`}><g className="sch-bscale"><title>{b.n}</title><Building k={b.k} /></g></g>
+      ))}
+      <g className="sch-bld sch-kremlin" transform={`translate(${KREMLIN[0]},${KREMLIN[1] + 6})`}>
+        <g className="sch-bscale"><Building k="kremlin" /><text className="sch-lm kremlin" y={11} textAnchor="middle">Кремль</text></g>
+      </g>
     </>
   ), [bg, debugMode])
 
@@ -1046,9 +1156,9 @@ const SchemeView = forwardRef<SchemeApi, Props>(function SchemeView({ selected, 
   return (
     <div ref={box} className={`scheme ${zoomCls} ${focusRoute ? 'focus' : ''} ${debugMode === 'thin' ? 'dbg-thin' : ''}`}>
       <style>{dimCss + selCss}</style>
-      <svg className="sch-layer" width="100%" height="100%"><g ref={gBg}>{bgEl}</g></svg>
+      <div ref={svgBg} className="sch-layer sch-svg"><svg width="100%" height="100%"><g ref={gBg}>{bgEl}</g></svg></div>
       <canvas ref={glowCv} className="sch-layer sch-cv" />
-      <svg className="sch-layer sch-fg" width="100%" height="100%"><g ref={gFg}>{fg}</g></svg>
+      <div ref={svgFg} className="sch-layer sch-svg sch-fg"><svg width="100%" height="100%"><g ref={gFg}>{fg}</g></svg></div>
       <canvas ref={fxCv} className="sch-layer sch-cv" />
       {selPt && (
         <div ref={pin} className="sch-pin">

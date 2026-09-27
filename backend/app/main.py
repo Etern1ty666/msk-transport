@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 
 from app.events import bus
 from app.ml import geo as G
+from app import settings as SET
 from app.ml.model import Coefficients
 from app.pipeline import SUB_START, pipeline
 from app.store import Query, QueryError, Store
@@ -106,7 +107,12 @@ def _routes(s: str | None) -> tuple[int, ...]:
         raise QueryError("route: список номеров через запятую, например 1,7,17") from e
 
 
-def _coef(weather: float, event: float, season: float, trend: float, holiday: float) -> Coefficients:
+def _coef(weather: float | None = None, event: float | None = None, season: float | None = None,
+          trend: float | None = None, holiday: float | None = None) -> Coefficients:
+    # не переданный коэффициент — из настроек, сохранённых на сервере (страница «Настройки»)
+    saved = SET.get().coef
+    weather, event, season, trend, holiday = (saved[k] if v is None else v for k, v in
+                                              zip(("weather", "event", "season", "trend", "holiday"), (weather, event, season, trend, holiday)))
     for name, v, lo, hi in [("weather", weather, 0, 3), ("event", event, 0, 3), ("season", season, 0.3, 2),
                             ("trend", trend, 0, 3), ("holiday", holiday, 0, 3)]:
         if not lo <= v <= hi:
@@ -163,7 +169,7 @@ async def forecast(
     hour_from: int = 0, hour_to: int = 23,
     agg: str | None = Q(None, description="hour | day | month | hour_of_day | weekday"),
     by_route: bool = False,
-    weather: float = 1.0, event: float = 1.0, season: float = 1.0, trend: float = 1.0, holiday: float = 1.0,
+    weather: float | None = None, event: float | None = None, season: float | None = None, trend: float | None = None, holiday: float | None = None,
 ):
     return _cached_forecast(_query(horizon, date, month, date_from, date_to, route, stop_id, hour_from, hour_to,
                                    agg, by_route, weather, event, season, trend, holiday))
@@ -174,7 +180,7 @@ def export(
     format: str = "csv", horizon: str = "day", date: str | None = None, month: str | None = None,
     date_from: str | None = None, date_to: str | None = None, route: str | None = None,
     stop_id: str | None = None, hour_from: int = 0, hour_to: int = 23,
-    weather: float = 1.0, event: float = 1.0, season: float = 1.0, trend: float = 1.0, holiday: float = 1.0,
+    weather: float | None = None, event: float | None = None, season: float | None = None, trend: float | None = None, holiday: float | None = None,
 ):
     q = _query(horizon, date, month, date_from, date_to, route, stop_id, hour_from, hour_to, None, False,
                weather, event, season, trend, holiday)
@@ -188,26 +194,26 @@ def history(route: str | None = None, date_from: str | None = None, date_to: str
 
 
 @app.get("/api/decompose", tags=["model"], summary="Разложение прогноза дня на компоненты")
-def decompose(route: int, date: str = SUB_START, weather: float = 1.0, event: float = 1.0, season: float = 1.0,
-              trend: float = 1.0, holiday: float = 1.0):
+def decompose(route: int, date: str = SUB_START, weather: float | None = None, event: float | None = None, season: float | None = None,
+              trend: float | None = None, holiday: float | None = None):
     return store().decompose(route, date, _coef(weather, event, season, trend, holiday))
 
 
 @app.get("/api/load", tags=["forecast"], summary="Снимок загрузки маршрутов на дату и час (для карты)")
-async def load(date: str = SUB_START, hour: int = 8, weather: float = 1.0, event: float = 1.0, season: float = 1.0,
-         trend: float = 1.0, holiday: float = 1.0):
+async def load(date: str = SUB_START, hour: int = 8, weather: float | None = None, event: float | None = None, season: float | None = None,
+         trend: float | None = None, holiday: float | None = None):
     return store().load_snapshot(date, hour, _coef(weather, event, season, trend, holiday))
 
 
 @app.get("/api/day", tags=["forecast"], summary="Сутки целиком: посадки, вагоны, загрузка и дефицит по маршрутам × часам")
-async def day(date: str = SUB_START, weather: float = 1.0, event: float = 1.0, season: float = 1.0,
-              trend: float = 1.0, holiday: float = 1.0):
+async def day(date: str = SUB_START, weather: float | None = None, event: float | None = None, season: float | None = None,
+              trend: float | None = None, holiday: float | None = None):
     return store().day_view(date, _coef(weather, event, season, trend, holiday))
 
 
 @app.get("/api/recommendations", tags=["forecast"], summary="Перегруженные часы и рекомендация по выпуску вагонов")
-async def recommendations(date: str = SUB_START, min_ratio: float = 1.0, weather: float = 1.0, event: float = 1.0,
-                    season: float = 1.0, trend: float = 1.0, holiday: float = 1.0):
+async def recommendations(date: str = SUB_START, min_ratio: float = 1.0, weather: float | None = None, event: float | None = None,
+                    season: float | None = None, trend: float | None = None, holiday: float | None = None):
     return store().recommendations(date, _coef(weather, event, season, trend, holiday), min_ratio)
 
 
@@ -225,6 +231,30 @@ def backtest_hourly(route: int | None = None):
 def submission():
     s = store()
     return FileResponse(s.art.submission_path, media_type="text/csv", filename="submission.csv")
+
+
+@app.get("/api/settings", tags=["settings"], summary="Настройки сервиса: коэффициенты прогноза, норматив, пороги рекомендаций")
+def get_settings():
+    s = store()
+    return {**SET.get().as_dict(), "defaults": SET.DEFAULTS.as_dict(), "coef_range": SET.COEF_RANGE, "limits": SET.LIMITS,
+            "norm_base": {str(r): round(float(t), 1) for r, t in zip(s.routes, s.target_base)}}
+
+
+@app.put("/api/settings", tags=["settings"], summary="Сохранить настройки — прогноз у всех пользователей считается с ними")
+async def put_settings(request: Request):
+    try:
+        SET.save(await request.json())
+    except SET.SettingsError as e:
+        raise QueryError(str(e)) from e
+    _cached_forecast.cache_clear()
+    return get_settings()
+
+
+@app.post("/api/settings/reset", tags=["settings"], summary="Вернуть настройки модели по умолчанию")
+def reset_settings():
+    SET.save(SET.DEFAULTS.as_dict())
+    _cached_forecast.cache_clear()
+    return get_settings()
 
 
 @app.get("/api/pipeline", tags=["pipeline"], summary="Состояние конвейера и последние логи")
@@ -318,7 +348,7 @@ async def ws_live(ws: WebSocket):
             key = (ctl["date"], json.dumps(ctl["coef"], sort_keys=True))
             if key not in snaps:
                 try:
-                    c = Coefficients(**{k: float(v) for k, v in ctl["coef"].items()})
+                    c = Coefficients(**{**SET.get().coef, **{k: float(v) for k, v in ctl["coef"].items()}})
                     snaps.clear()
                     snaps[key] = [store().load_snapshot(ctl["date"], h, c) for h in range(24)]
                 except QueryError as e:

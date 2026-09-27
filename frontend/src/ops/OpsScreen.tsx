@@ -1,24 +1,26 @@
-import { BrainCircuit, CircleHelp, LayoutDashboard, Menu, Moon, Scale, Server, Table2, TrendingUp, TriangleAlert, Users, Workflow, X } from 'lucide-react'
+import { BookOpenText, ChartNoAxesCombined, ChevronDown, CircleMinus, CloudRain, CloudSnow, CloudSun, Gauge, Menu, Scale, Settings as Gear, ShieldCheck, TrendingUp, TriangleAlert, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { DEFAULT_COEF, fmt, useApi, type DayRoute, type DayView } from '../api'
-import { CoefPanel, useApp } from '../components'
+import { DEFAULT_COEF, freeWindow, OFFLINE, overLabel, TH, useDay, type DayRoute } from '../api'
+import { useApp } from '../components'
 import OpsMap, { type MapMode } from './OpsMap'
 import Intro from './Intro'
 import RouteBar from './RouteBar'
 import RoutePanel from './RoutePanel'
-import { TramSide } from './Fleet'
-import Timeline from './Timeline'
+import Timeline, { useLiveWeather } from './Timeline'
+import WeatherFx, { type Precip } from './WeatherFx'
 
 export const MENU = [
-  { key: 'overview', i: LayoutDashboard, t: 'Сводка' },
-  { key: 'forecast', i: Table2, t: 'Прогноз и выгрузка' },
-  { key: 'pipeline', i: Workflow, t: 'Под капотом' },
-  { key: 'model', i: BrainCircuit, t: 'Модель' },
-  { key: 'service', i: Server, t: 'Сервис и API' },
+  { key: 'summary', i: ChartNoAxesCombined, t: 'Сводка' },
+  { key: 'about', i: BookOpenText, t: 'О проекте' },
+  { key: 'settings', i: Gear, t: 'Настройки' },
 ]
 
-export default function OpsScreen({ drawer, openDrawer }: { drawer: string | null; openDrawer: (k: string | null) => void }) {
-  const { meta, geo, segments, schema, coef, setCoef, version } = useApp()
+export default function OpsScreen({ drawer, openDrawer, sidePage, sideWide }: {
+  drawer: string | null; openDrawer: (k: string | null) => void
+  sidePage?: React.ReactNode; sideWide?: boolean // «Сводка» / «Настройки» — панелью слева, карта при этом работает
+}) {
+  const full = drawer != null && !sidePage // страница на весь экран («О проекте») — карта на паузе, клавиши ей не нужны
+  const { meta, geo, segments, schema, coef, settings, version } = useApp()
   // старт в режиме Live: сегодня и текущее время (если сегодня вне периода прогноза — Live сам выключится и вернёт демо-день)
   const [date, setDate] = useState(() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}` })
   const [minute, setMinute] = useState(() => { const t = new Date(); return t.getHours() * 60 + t.getMinutes() })
@@ -34,7 +36,6 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
   const menuBtn = (cls: string) => (
     <button className={cls} onClick={openMenu} title="Меню"><Menu size={cls.includes('tl-menu') ? 17 : 22} /></button>
   )
-  const [showCoef, setShowCoef] = useState(false)
   const [live, setLive] = useState(true) // по умолчанию — реальное время
   const introRef = useRef(false)
   const [intro, setIntroState] = useState(() => { try { return !localStorage.getItem('tf-intro-seen') } catch { return true } })
@@ -42,7 +43,7 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
   const setIntro = (v: boolean) => { setIntroState(v); if (!v) try { localStorage.setItem('tf-intro-seen', '1') } catch { /* без хранилища */ } }
   // пока меню или коэффициенты открыты — держим их под кнопкой, даже если шкала сдвигается
   useEffect(() => {
-    if (!menu && !showCoef) return
+    if (!menu) return
     let raf = 0
     const tick = () => {
       const r = anchor.current?.getBoundingClientRect()
@@ -51,7 +52,7 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     }
     tick()
     return () => cancelAnimationFrame(raf)
-  }, [menu, showCoef])
+  }, [menu])
   // по умолчанию — схема маршрутов; сохранённый старый режим «схема по карте» тоже открывает схему
   const [mode, setModeState] = useState<MapMode>(() => { try { return localStorage.getItem('tf-map-mode') === 'map' ? 'map' : 'metro' } catch { return 'metro' } })
   const setMode = (m: MapMode) => { setModeState(m); try { localStorage.setItem('tf-map-mode', m) } catch { /* без хранилища — просто не запоминаем */ } }
@@ -73,9 +74,9 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
   }, [])
   const stopKeys = focus === 'stops' && stop != null
   const routeKeys = focus === 'routes'
-  const showCoefRef = useRef(false)
-  showCoefRef.current = showCoef
-  const day = useApi<DayView>('/api/day', { date, ...coef, v: version })
+  // ответ /api/day зависит от коэффициентов и норматива (пороги — только в интерфейсе): они и есть ключ кэша
+  const norm = settings?.norm_scale ?? 1
+  const day = useDay(date, { ...coef, v: version, n: norm }, { min: meta?.forecast.from ?? '2025-11-01', max: meta?.forecast.to ?? '2026-10-31' })
   const hour = Math.floor(minute / 60)
   const timeRef = useRef(minute)
   timeRef.current = minute
@@ -89,7 +90,7 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
       const tag = (e.target as HTMLElement).tagName
       if (drawer || tag === 'INPUT' || tag === 'SELECT') return
       if (e.key === ' ') { e.preventDefault(); setPlaying((p) => !p) }
-      else if (e.key === 'Escape') { if (menu) setMenu(false); else if (showCoefRef.current) setShowCoef(false); else if (introRef.current) setIntro(false); else if (stopRef.current) setStop(null); else setRoute(null) }
+      else if (e.key === 'Escape') { if (menu) setMenu(false); else if (introRef.current) setIntro(false); else if (stopRef.current) setStop(null); else setRoute(null) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -99,7 +100,7 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
   const sel = routes.find((r) => r.route === route)
   // порядок перелистывания веток в карточке — как на панели маршрутов внизу
   const routeList = useMemo(() => geo.map((g) => routes.find((r) => r.route === g.route)).filter((r): r is DayRoute => r != null), [geo, routes])
-  const select = (r: number | null, s?: string | null) => { setRoute(r); setStop(s ?? null); if (r != null) setIntro(false) }
+  const select = (r: number | null, s?: string | null) => { setRoute(r); setStop(s ?? null); if (r != null) { setIntro(false); if (sidePage) openDrawer(null) } }
   const routeNav = useRef<(d: -1 | 1) => void>(() => {})
   routeNav.current = (d) => {
     const ids = routeList.map((x) => x.route)
@@ -108,7 +109,7 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     if (n != null) select(n)
   }
   useEffect(() => {
-    if (!routeKeys || drawer || menu || showCoef) return
+    if (!routeKeys || full || menu) return
     const k = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return
@@ -117,111 +118,131 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
-  }, [routeKeys, drawer, menu, showCoef])
+  }, [routeKeys, full, menu])
 
-  const coefChanged = (Object.keys(DEFAULT_COEF) as (keyof typeof DEFAULT_COEF)[]).some((k) => coef[k] !== DEFAULT_COEF[k])
+  // прогноз скорректирован в «Настройках» (коэффициенты или норматив отличаются от модели)
+  const coefChanged = (Object.keys(DEFAULT_COEF) as (keyof typeof DEFAULT_COEF)[]).some((k) => coef[k] !== DEFAULT_COEF[k]) || (settings?.norm_scale ?? 1) !== 1
 
   // состояние сети «сейчас»: даже ночью и без проблем оператор видит, что прогноз посчитан и всё под контролем
-  const [calc, setCalc] = useState(true)
+  const [calc, setCalc] = useState(false)
+  const recalcKey = JSON.stringify(coef) + version + '|' + norm
+  const prevCalc = useRef(recalcKey)
   useEffect(() => {
-    if (!day.data) return
+    if (prevCalc.current === recalcKey) return // не менялось (в т. ч. повторный запуск эффекта) — не пересчитываем
+    prevCalc.current = recalcKey
     setCalc(true)
     const t = setTimeout(() => setCalc(false), 1600) // столько же идёт «волна пересчёта» по схеме
     return () => clearTimeout(t)
-  }, [day.data])
-  const calm = useMemo(() => {
-    if (!routes.length) return null
-    const running = routes.filter((r) => r.vehicles[hour] > 0)
-    // ближайший час впереди, когда за норматив выйдет ветка, которая сейчас в норме
-    const over = (r: DayRoute, h: number) => r.vehicles[h] > 0 && r.ratio[h] >= 1
-    let next: { h: number; route: number } | null = null
-    for (let h = hour + 1; h < 24 && !next; h++) {
-      const r = routes.filter((x) => over(x, h) && !over(x, hour)).sort((a, b) => b.ratio[h] - a.ratio[h])[0]
-      if (r) next = { h, route: r.route }
-    }
-    let firstOut: number | null = null
-    if (!running.length) for (let h = hour + 1; h < 24 && firstOut == null; h++) if (routes.some((r) => r.vehicles[h] > 0)) firstOut = h
-    return {
-      night: !running.length, firstOut, next,
-      vehicles: Math.round(running.reduce((a, r) => a + r.vehicles[hour], 0)),
-      people: Math.round(running.reduce((a, r) => a + r.boardings[hour], 0)),
-      load: Math.round(Math.max(0, ...running.map((r) => r.ratio[hour])) * 100),
-    }
-  }, [routes, hour])
+  }, [recalcKey])
+  // лента событий под шкалой времени: всё, что оператору нужно заметить в выбранный час.
+  // События одного типа на нескольких ветках складываются в колоду; по нажатию раскрываются, по ветке — открывается её карточка.
   const hh = (h: number) => `${String(h).padStart(2, '0')}:00`
-  // цвет пассажиров по самой загруженной ветке: до 80% — зелёный, 80–100% плавно в оранжевый, выше 100% — красный
-  const peopleColor = (load: number) => {
-    if (load > 100) return '#f87171'
-    const t = Math.max(0, Math.min(1, (load - 80) / 20))
-    const mix = (a: number, b: number) => Math.round(a + (b - a) * t)
-    return `rgb(${mix(74, 251)}, ${mix(222, 146)}, ${mix(128, 60)})`
-  }
-  const stats = calm && (
-    calc || day.loading
-      ? <div className="okchip calc" title="Пересчёт прогноза по сети…"><i /></div>
-      : calm.night
-        ? <div className="okchip night" title={`Ночной перерыв: трамваи не выходят на линию${calm.firstOut != null ? `, выпуск с ${hh(calm.firstOut)}` : ''}${calm.next ? `; внимание в ${hh(calm.next.h)} (№${calm.next.route})` : '; перегрузок не ожидается'}`}>
-            <Moon size={14} />{calm.firstOut != null && <><TramSide size={14} /><b>{hh(calm.firstOut)}</b></>}
-            {calm.next && <><TriangleAlert size={13} className="warn" /><span>{hh(calm.next.h)}</span></>}
-          </div>
-        : <div className="okrow">
-            <div className="okchip people" style={{ ['--pc' as string]: peopleColor(calm.load) }}
-              title={`Пассажиров за час по сети: ${fmt(calm.people)}. Самая загруженная ветка — ${calm.load}% норматива`}>
-              <Users size={15} /><b>{fmt(calm.people)}</b>
-            </div>
-            <div className="okchip" title={`Вагонов на линии: ${calm.vehicles}`}><TramSide size={15} /><b>{calm.vehicles}</b></div>
-            {calm.next && (
-              <div className="okchip next" title={`Следующий рост: к ${hh(calm.next.h)} за норматив выйдет №${calm.next.route}`}>
-                <TrendingUp size={15} /><b>{hh(calm.next.h)}</b>
-              </div>
-            )}
-          </div>
-  )
-  const badges = (coefChanged || stats) && (
+  const [deck, setDeck] = useState<string | null>(null)
+  useEffect(() => { setDeck(null) }, [hour])
+  const events = useMemo(() => {
+    const on = (r: DayRoute, h: number) => h < 24 && r.vehicles[h] > 0
+    const list: { key: string; title: string; tone: 'crit' | 'soon' | 'high' | 'free'; icon: typeof TriangleAlert; items: { r: DayRoute; note: string; tip: string }[] }[] = [
+      { key: 'over', title: 'Перегрузка', tone: 'crit', icon: TriangleAlert, items: [] },
+      { key: 'soon', title: 'Скоро перегрузка', tone: 'soon', icon: TrendingUp, items: [] },
+      { key: 'high', title: 'Загрузка выше 80%', tone: 'high', icon: Gauge, items: [] },
+      { key: 'free', title: 'Можно снять вагоны', tone: 'free', icon: CircleMinus, items: [] },
+    ]
+    const [over, soon, high, free] = list
+    for (const r of [...routes].sort((a, b) => b.ratio[hour] - a.ratio[hour])) {
+      if (!on(r, hour)) continue
+      const q = r.ratio[hour]
+      if (q >= 1) over.items.push({ r, note: overLabel(q), tip: `№${r.route}: ${Math.round(q * 100)}% норматива — перегрузка` })
+      else if (on(r, hour + 1) && r.ratio[hour + 1] >= 1) soon.items.push({ r, note: hh(hour + 1), tip: `№${r.route}: в ${hh(hour + 1)} загрузка ${Math.round(r.ratio[hour + 1] * 100)}% — перегрузка` })
+      else if (q >= TH.soft) high.items.push({ r, note: `${Math.round(q * 100)}%`, tip: `№${r.route}: ${Math.round(q * 100)}% норматива — на грани` })
+      else if (freeWindow(r, hour)?.from === hour) free.items.push({ r, note: `${Math.round(q * 100)}%`, tip: `№${r.route}: загрузка ${Math.round(q * 100)}% — лишние вагоны можно отдать` })
+    }
+    return list.filter((e) => e.items.length)
+  }, [routes, hour])
+  const openRoute = (n: number) => { setDeck(null); select(n) }
+  // блок событий виден всегда — и пока данные ещё грузятся (там индикатор «Загрузка данных…»)
+  const badges = (
     <div className="probwrap">
-      {stats}
-      {coefChanged && (
-        <span className="coefchip" title="Прогноз скорректирован коэффициентами">
-          <button onClick={() => setShowCoef(true)} title="Прогноз скорректирован коэффициентами — открыть"><Scale size={14} /></button>
-          <button onClick={() => setCoef(DEFAULT_COEF)} title="Сбросить"><X size={13} /></button>
-        </span>
-      )}
+      <div className="evbar">
+        {(calc || day.loading || !day.data)
+          ? <div className="ev busy"><span className="ev-h"><i className="spin-dot" /><span className="ev-t">{calc ? 'Обновляем прогноз…' : 'Загрузка данных…'}</span></span></div>
+          : events.map((e) => {
+          const one = e.items.length === 1 ? e.items[0] : null
+          const open = deck === e.key
+          return (
+            <div key={e.key} className={`ev ${e.tone} ${e.items.length > 1 ? 'deck' : ''} ${open ? 'open' : ''}`}>
+              <button className="ev-h" onClick={() => (one ? openRoute(one.r.route) : setDeck(open ? null : e.key))}
+                title={one ? `${one.tip} — открыть` : `${e.title}: ${e.items.length} ${e.items.length < 5 ? 'ветки' : 'веток'} — ${open ? 'свернуть' : 'развернуть'}`}>
+                <e.icon size={14} /><span className="ev-t">{e.title}</span>
+                {one ? <><i className="rn" style={{ background: one.r.color }}>{one.r.route}</i><b>{one.note}</b></>
+                  : <><span className="ev-dots">{e.items.slice(0, 4).map((it) => <i key={it.r.route} style={{ background: it.r.color }} />)}</span><b className="ev-n">{e.items.length}</b>
+                    <ChevronDown size={13} className="caret" /></>}
+              </button>
+              {open && (
+                <div className="ev-list">
+                  {e.items.map((it) => (
+                    <button key={it.r.route} onClick={() => openRoute(it.r.route)} title={`${it.tip} — открыть`}>
+                      <i className="rn" style={{ background: it.r.color }}>{it.r.route}</i><b>{it.note}</b>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {coefChanged && (
+          <div className="ev info">
+            <button className="ev-h" onClick={() => openDrawer('settings')} title="Прогноз скорректирован в «Настройках» — открыть"><Scale size={14} /><span className="ev-t">Прогноз скорректирован</span></button>
+          </div>
+        )}
+        {!calc && !day.loading && !events.length && !coefChanged && <div className="ev calm"><span className="ev-h"><ShieldCheck size={14} /><span className="ev-t">Всё спокойно</span></span></div>}
+      </div>
+      {day.error && <div className="ev crit"><span className="ev-h"><TriangleAlert size={14} /><span className="ev-t">{day.error === OFFLINE ? `${OFFLINE}. Повторяю подключение…` : day.error}</span></span></div>}
     </div>
   )
 
+  // погода для эффекта: в Live — текущая (Open-Meteo), иначе — архив/прогноз погоды выбранного часа
+  const liveW = useLiveWeather(live)
+  const [wxOn, setWxOn] = useState(() => { try { return localStorage.getItem('tf-wx') !== '0' } catch { return true } })
+  const toggleWx = () => setWxOn((v) => { try { localStorage.setItem('tf-wx', v ? '0' : '1') } catch { /* без хранилища */ } return !v })
+  const wd = day.data?.weather
+  const wNow = live && liveW ? liveW : wd ? { temp: wd.temp[hour], precip: wd.precip[hour], snow: wd.snow[hour] } : null
+  const wKind: 'rain' | 'snow' | null = wNow && wNow.precip > 0.05 ? (wNow.snow > 0 || wNow.temp <= 0.5 ? 'snow' : 'rain') : null
+  const fx: Precip = wxOn && wKind ? { kind: wKind, k: Math.min(1, (wNow?.precip ?? 0) / 2) } : null
+  const WxIcon = wKind === 'snow' ? CloudSnow : wKind === 'rain' ? CloudRain : CloudSun
+  const wxBtn = (
+    <button className={`mapbtn glass ${wxOn ? 'on' : ''}`} onClick={toggleWx} aria-pressed={wxOn} aria-label="Эффекты погоды"
+      title={wxOn ? (wKind ? `Эффект погоды: ${wKind === 'snow' ? 'снег' : 'дождь'} — выключить` : 'Эффекты погоды включены (сейчас без осадков) — выключить') : 'Включить эффекты погоды: дождь и снег на схеме'}>
+      <WxIcon size={20} strokeWidth={1.75} />
+    </button>
+  )
+
   // карта и панель зависят только от часа — при плавном проигрывании не перерисовываем их каждый кадр
-  const mapEl = useMemo(() => <OpsMap geo={geo} segments={segments} schema={schema} day={day.data} hour={hour} selected={route} selectedStop={stop} onSelect={select} mode={mode} onMode={setMode} timeRef={timeRef} paused={drawer != null}
-    help={<button className="mapbtn glass" onClick={() => { select(null); setIntro(true) }} title="О проекте и легенда"><CircleHelp size={20} strokeWidth={1.75} /></button>} />,
+  const mapEl = useMemo(() => <OpsMap geo={geo} segments={segments} schema={schema} day={day.data} hour={hour} selected={route} selectedStop={stop} onSelect={select} mode={mode} onMode={setMode} timeRef={timeRef} paused={full} wxBtn={wxBtn}
+ />,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [geo, segments, schema, day.data, hour, route, stop, mode, drawer])
+    [geo, segments, schema, day.data, hour, route, stop, mode, full, wxOn, wKind])
   const panelEl = useMemo(() => sel && (
-    <RoutePanel route={sel} geo={geo.find((g) => g.route === sel.route)} allGeo={geo} list={routeList} depots={day.data?.depots} date={date} hour={hour} stopId={stop} timeRef={timeRef} payCats={day.data?.pay_cats} keys={!drawer && !menu && !showCoef} lr={stopKeys && !drawer && !menu && !showCoef}
+    <RoutePanel route={sel} geo={geo.find((g) => g.route === sel.route)} allGeo={geo} list={routeList} depots={day.data?.depots} date={date} hour={hour} stopId={stop} timeRef={timeRef} payCats={day.data?.pay_cats} keys={!full && !menu} lr={stopKeys && !full && !menu}
       onClose={() => select(null)} onHour={(h) => { setPlaying(false); setLive(false); setMinute(h * 60) }} onStop={(s) => setStop(s)}
       onRoute={(r, s) => select(r, s)} />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [sel, geo, routeList, day.data, date, hour, stop, drawer, menu, showCoef, stopKeys])
+  ), [sel, geo, routeList, day.data, date, hour, stop, full, menu, stopKeys])
 
   return (
-    <div className={`ops ${sel ? 'side-open' : ''}`}>
+    <div className={`ops ${sel || sidePage ? 'side-open' : ''} ${sidePage && sideWide ? 'side-wide' : ''}`}>
       {mapEl}
+      <WeatherFx fx={fx} />
 
       {menuBtn('float menubtn glass')}
       <Timeline lead={menuBtn('seg-solo tl-menu')} date={date} setDate={setDate} minute={minute} setMinute={setMinute} playing={playing} setPlaying={setPlaying}
-        speed={speed} setSpeed={setSpeed} day={day.data} min={min} max={max} below={badges} keys={!drawer && !menu && !stopKeys && !routeKeys} focused={focus === 'time' && stop != null} live={live} setLive={setLive} />
+        speed={speed} setSpeed={setSpeed} day={day.data} min={min} max={max} below={badges} keys={!full && !menu && !stopKeys && !routeKeys} focused={focus === 'time' && stop != null} live={live} setLive={setLive} />
 
-      {showCoef && (
-        <div className="float glass coef-pop" style={{ top: menuAt.top, left: menuAt.left }}>
-          <button className="iconbtn coef-x" onClick={() => setShowCoef(false)} title="Закрыть"><X size={16} /></button>
-          <CoefPanel />
-        </div>
-      )}
-      {day.error && <div className="float glass" style={{ top: 110, left: '50%', transform: 'translateX(-50%)', padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'center' }}><TriangleAlert size={16} /> {day.error}</div>}
 
-      {panelEl}
+      {sidePage ?? panelEl}
 
       {intro && !sel && <Intro onClose={() => setIntro(false)} />}
 
-      <RouteBar focused={routeKeys} geo={geo} routes={routes} hour={hour} selected={route} onSelect={(r) => select(r)} />
+      <RouteBar focused={routeKeys} geo={geo} selected={route} onSelect={(r) => select(r)} />
 
       {menu && (
         <>
@@ -230,13 +251,10 @@ export default function OpsScreen({ drawer, openDrawer }: { drawer: string | nul
             <div className="mp-head"><b>TramFlow</b><span className="note">ИИ-прогноз загрузки трамваев</span>
               <button className="iconbtn" onClick={() => setMenu(false)} title="Закрыть"><X size={18} /></button></div>
             {MENU.map((m) => (
-              <button key={m.key} onClick={() => { setMenu(false); openDrawer(m.key) }}><m.i size={18} strokeWidth={1.75} />{m.t}</button>
+              <button key={m.key} onClick={() => { setMenu(false); openDrawer(m.key) }}>
+                <m.i size={18} strokeWidth={1.75} />{m.t}{m.key === 'settings' && coefChanged && <i className="mdot" title="Прогноз скорректирован" />}
+              </button>
             ))}
-            <hr />
-            <button onClick={() => { setMenu(false); setShowCoef(true) }}>
-              <Scale size={18} strokeWidth={1.75} />Коэффициенты{coefChanged && <i className="mdot" />}
-            </button>
-            <button onClick={() => { setMenu(false); setIntro(true) }}><CircleHelp size={18} strokeWidth={1.75} />О проекте и легенда</button>
           </nav>
         </>
       )}

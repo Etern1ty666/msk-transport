@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, CloudRain, CloudSnow, CloudSun, Moon, Pause, Play, Snowflake, Sun, ThermometerSnowflake, type LucideIcon } from 'lucide-react'
-import { api, at24, type DayView } from '../api'
+import { at24, fetchDay, type DayView } from '../api'
 import { useApp } from '../components'
 
 export const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 4, 8]
@@ -37,7 +37,7 @@ function weatherOf(temp: number, precip: number, snow: number, h: number): { ico
 }
 
 /** Текущая погода в Москве для режима Live — Open-Meteo (https://open-meteo.com, без ключа), обновление раз в 10 минут. */
-function useLiveWeather(on: boolean) {
+export function useLiveWeather(on: boolean) {
   const [w, setW] = useState<{ temp: number; precip: number; snow: number } | null>(null)
   useEffect(() => {
     if (!on) return
@@ -157,8 +157,9 @@ function smooth(pts: [number, number][]) {
 /** Лента времени как в видеоредакторе: указатель неподвижен в центре, под ним прокручиваются часы. */
 /** Кэш суток для ленты: текущие и соседние дни (±2) — график идёт непрерывно через полночь и не «мигает» при смене дня. */
 function useDayCache(date: string, min: string, max: string) {
-  const { coef, version } = useApp()
-  const key = JSON.stringify(coef) + version
+  const { coef, version, settings } = useApp()
+  const norm = settings?.norm_scale ?? 1
+  const key = JSON.stringify(coef) + version + '|' + norm
   const store = useRef<{ key: string; days: Record<string, DayView | null | 'loading'> }>({ key, days: {} })
   const [ver, bump] = useState(0)
   if (store.current.key !== key) store.current = { key, days: {} }
@@ -168,7 +169,7 @@ function useDayCache(date: string, min: string, max: string) {
       const d = shift(date, k)
       if (d < min || d > max || st.days[d] !== undefined) continue
       st.days[d] = 'loading'
-      api<DayView>('/api/day', { date: d, ...coef, v: version })
+      fetchDay(d, { ...coef, v: version, n: norm }) // тот же кэш и ключ, что у главного экрана
         .then((v) => { if (store.current === st) { st.days[d] = v; bump((x) => x + 1) } })
         .catch(() => { st.days[d] = null })
     }

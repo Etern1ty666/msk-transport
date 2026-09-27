@@ -34,8 +34,8 @@ type Props = {
   selected: number | null; selectedStop: string | null
   onSelect: (route: number | null, stopId?: string | null) => void
   mode: MapMode; onMode: (m: MapMode) => void
-  help?: React.ReactNode
   paused?: boolean // карту закрывает страница раздела — анимацию не крутим
+  wxBtn?: React.ReactNode // кнопка эффектов погоды — в столбце управления картой
   timeRef?: React.MutableRefObject<number> // текущая минута (дробная) — для плавного «дыхания» свечения без перерисовки React
 }
 
@@ -78,7 +78,7 @@ function glowData({ geo, day, sch, selected }: GlowSrc, minute: number) {
   return { heat: fc(heat), hot: fc(hot) }
 }
 
-export default function OpsMap({ geo, segments, schema, day, hour, selected, selectedStop, onSelect, mode, onMode, help, timeRef, paused = false }: Props) {
+export default function OpsMap({ geo, segments, schema, day, hour, selected, selectedStop, onSelect, mode, onMode, timeRef, paused = false, wxBtn }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<MLMap | null>(null)
   const base = useRef<{ id: string; keep: boolean; vis: string }[]>([])
@@ -383,11 +383,11 @@ export default function OpsMap({ geo, segments, schema, day, hour, selected, sel
       {mode === 'metro' && (
         <SchemeView ref={scheme} selected={selected != null ? String(selected) : null} selectedStop={selectedStop} onSelect={pickScheme} alerts={schemeAlerts} dataRoutes={dataRoutes}
           geo={geo} day={day} hour={hour} timeRef={timeRef} paused={paused}
-          pad={isPhone() ? (selected != null ? { top: 170, bottom: Math.round(window.innerHeight * 0.56) + 10, left: 12, right: 12 } : { top: 220, bottom: 70, left: 8, right: 60 }) : { top: 110, bottom: 76, left: selected != null ? sideW() + 10 : 30, right: 80 }} />
+          pad={isPhone() ? (selected != null ? { top: 170, bottom: Math.round(window.innerHeight * 0.56) + 10, left: 12, right: 12 } : { top: 220, bottom: 70, left: 8, right: 60 }) : { top: 170, bottom: 76, left: selected != null ? sideW() + 10 : 30, right: 80 }} />
       )}
       {toast && <div className="float glass sch-toast">{toast}</div>}
       <div className="float mapctl">
-        {help}
+        {wxBtn}
         {/* переключатель «карта»: одна иконка; нажат (подсвечен) — подложка-карта, отжат — схема */}
         <button className={`mapbtn glass ${mode === 'map' ? 'on' : ''}`} onClick={() => { const nx = MODE_NEXT[mode]; onMode(nx); setToast(MODE_TITLE[nx]) }}
           title={mode === 'map' ? 'Карта включена — выключить (схема)' : 'Включить карту'} aria-label="Карта" aria-pressed={mode === 'map'}>

@@ -1,7 +1,6 @@
 import { TriangleAlert } from 'lucide-react'
 import { createContext, useContext, type ReactNode } from 'react'
-import type { Coef, Meta, RouteGeo, Schema, Segment, Stage, LogEvent } from './api'
-import { DEFAULT_COEF } from './api'
+import type { Coef, Meta, RouteGeo, Schema, Segment, Settings, Stage, LogEvent } from './api'
 
 export type Ctx = {
   meta: Meta | null
@@ -9,8 +8,11 @@ export type Ctx = {
   segments: Segment[]
   allRoutes: string[]
   schema: Schema | null
-  coef: Coef
-  setCoef: (c: Coef) => void
+  coef: Coef // сохранённые на сервере коэффициенты (страница «Настройки»)
+  settings: Settings | null
+  saveSettings: (s: Settings) => Promise<void>
+  resetSettings: () => Promise<void>
+  settingsRev: number // растёт при каждом сохранении — экраны перезапрашивают прогноз
   stages: Stage[]
   logs: LogEvent[]
   running: boolean
@@ -65,30 +67,26 @@ export function RouteChips({ value, onChange, multi = true }: { value: number[];
   )
 }
 
-const COEF_INFO: { key: keyof Coef; title: string; desc: string; min: number; max: number; step: number }[] = [
+export const COEF_INFO: { key: keyof Coef; title: string; desc: string; min: number; max: number; step: number }[] = [
   { key: 'weather', title: 'Погода', desc: 'Сила эффекта осадков: 0 — игнорировать, 2 — вдвое сильнее', min: 0, max: 3, step: 0.1 },
-  { key: 'event', title: 'Событие / перекрытие', desc: 'Множитель на весь выбранный интервал (напр. 0.7 — перекрытие участка)', min: 0, max: 2, step: 0.05 },
-  { key: 'season', title: 'Сезон', desc: 'Сезонная поправка горизонта (1.05 — +5% к уровню)', min: 0.5, max: 1.5, step: 0.01 },
-  { key: 'trend', title: 'Тренд маршрутов', desc: 'Сила недавнего тренда маршрутов', min: 0, max: 3, step: 0.1 },
+  { key: 'event', title: 'События', desc: 'Внешние события: перекрытия дорог, ремонт путей, массовые мероприятия и скопления людей', min: 0, max: 2, step: 0.05 },
+  { key: 'season', title: 'Сезон', desc: 'Сезонная поправка уровня (1.05 — +5%)', min: 0.5, max: 1.5, step: 0.01 },
+  { key: 'trend', title: 'Тренд маршрутов', desc: 'Сила недавнего тренда маршрутов: 0 — без тренда', min: 0, max: 3, step: 0.1 },
   { key: 'holiday', title: 'Праздники', desc: 'Сила эффекта праздников и предновогодних дней', min: 0, max: 2, step: 0.1 },
 ]
 
-export function CoefPanel() {
-  const { coef, setCoef } = useApp()
-  const changed = COEF_INFO.some((c) => coef[c.key] !== DEFAULT_COEF[c.key])
+/** Какие корректировки действуют сейчас (сохранены на сервере, общие для всех) и переход в «Настройки». */
+export function SettingsHint() {
+  const { settings, go } = useApp()
+  const changed = settings?.defaults && (COEF_INFO.some((c) => settings.coef[c.key] !== settings.defaults!.coef[c.key]) || settings.norm_scale !== settings.defaults.norm_scale)
   return (
-    <Card title="Корректирующие коэффициенты" hint={changed ? <button className="btn" onClick={() => setCoef(DEFAULT_COEF)}>Сбросить</button> : 'применяются ко всем экранам'}>
-      <div className="coef">
+    <Card title="Корректировки прогноза" hint={changed ? 'действуют для всех' : 'как в модели'}>
+      <div className="shint">
         {COEF_INFO.map((c) => (
-          <div key={c.key} className={`k ${coef[c.key] !== DEFAULT_COEF[c.key] ? 'changed' : ''}`} title={c.desc}>
-            <div className="name"><span>{c.title}</span><b>×{coef[c.key].toFixed(2)}</b></div>
-            <input type="range" min={c.min} max={c.max} step={c.step} value={coef[c.key]}
-              onChange={(e) => setCoef({ ...coef, [c.key]: Number(e.target.value) })} />
-            <input type="number" min={c.min} max={c.max} step={c.step} value={coef[c.key]}
-              onChange={(e) => setCoef({ ...coef, [c.key]: Math.min(c.max, Math.max(c.min, Number(e.target.value))) })} />
-          </div>
+          <div key={c.key} className={settings && settings.coef[c.key] !== 1 ? 'on' : ''}><span>{c.title}</span><b>×{(settings?.coef[c.key] ?? 1).toFixed(2)}</b></div>
         ))}
-        <div className="note">Прогноз пересчитывается на сервере сразу при изменении (≈10 мс).</div>
+        <div className={settings && settings.norm_scale !== 1 ? 'on' : ''}><span>Норматив на вагон</span><b>×{(settings?.norm_scale ?? 1).toFixed(2)}</b></div>
+        <button className="btn" onClick={() => go('settings')}>Изменить в настройках</button>
       </div>
     </Card>
   )

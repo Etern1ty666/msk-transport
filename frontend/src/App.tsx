@@ -1,24 +1,24 @@
-import { ArrowLeft, BrainCircuit, LayoutDashboard, RefreshCw, Server, Table2, TriangleAlert, Workflow } from 'lucide-react'
+import { ArrowLeft, BookOpenText, ChartNoAxesCombined, RefreshCw, Settings as Gear, TriangleAlert, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { api, DEFAULT_COEF, useSocket, type Coef, type LogEvent, type Meta, type RouteGeo, type Schema, type Segment, type Stage } from './api'
+import { api, DEFAULT_COEF, OFFLINE, TH, useSocket, type Coef, type LogEvent, type Meta, type RouteGeo, type Schema, type Segment, type Settings, type Stage } from './api'
 import { AppCtx } from './components'
 import OpsScreen from './ops/OpsScreen'
-import Overview from './pages/Overview'
-import ForecastPage from './pages/ForecastPage'
-import PipelinePage from './pages/PipelinePage'
-import ModelPage from './pages/ModelPage'
-import ServicePage from './pages/ServicePage'
+import AboutPage from './pages/AboutPage'
+import SummaryPage from './pages/SummaryPage'
+import SettingsPage from './pages/SettingsPage'
 
-const PAGES: Record<string, { title: string; sub: string; icon: typeof LayoutDashboard; el: () => React.ReactElement }> = {
-  overview: { title: 'Сводка', sub: 'Ключевые показатели прогноза на ноябрь–декабрь 2025', icon: LayoutDashboard, el: Overview },
-  forecast: { title: 'Прогноз и выгрузка', sub: 'День, месяц, год · маршрут, остановка, интервал · CSV и XLSX', icon: Table2, el: ForecastPage },
-  pipeline: { title: 'Под капотом', sub: 'Конвейер обработки данных в реальном времени', icon: Workflow, el: PipelinePage },
-  model: { title: 'Модель', sub: 'Компоненты модели, бэктест WAPE, вклад внешних источников', icon: BrainCircuit, el: ModelPage },
-  service: { title: 'Сервис и API', sub: 'Производительность, метрики, точки входа API', icon: Server, el: ServicePage },
+// меню — три раздела; прежние адреса (#overview, #model …) открывают раздел, куда вошла их страница
+// side — открывается панелью слева поверх карты (как карточка ветки); иначе — страница на весь экран
+const PAGES: Record<string, { title: string; sub: string; icon: typeof Gear; el: () => React.ReactElement; side?: boolean; wide?: boolean }> = {
+  about: { title: 'О проекте', sub: 'Как пользоваться, как считается прогноз, данные и сервис', icon: BookOpenText, el: AboutPage },
+  summary: { title: 'Сводка', sub: 'Показатели прогноза, где не хватает вагонов, таблица и выгрузка', icon: ChartNoAxesCombined, el: SummaryPage },
+  settings: { title: 'Настройки', sub: 'Коэффициенты прогноза, норматив и пороги рекомендаций — сохраняются на сервере и действуют для всех', icon: Gear, el: SettingsPage, side: true },
 }
+const ALIAS: Record<string, string> = { overview: 'summary', forecast: 'summary', model: 'about', pipeline: 'about', service: 'about', use: 'about' }
+const pageOf = (k: string) => ALIAS[k] ?? (k in PAGES ? k : null)
 
 export default function App() {
-  const hashKey = () => { const h = window.location.hash.slice(1); return h in PAGES ? h : null }
+  const hashKey = () => pageOf(window.location.hash.slice(1))
   const [drawer, setDrawer] = useState<string | null>(hashKey)
   const [meta, setMeta] = useState<Meta | null>(null)
   const [geo, setGeo] = useState<RouteGeo[]>([])
@@ -26,6 +26,8 @@ export default function App() {
   const [allRoutes, setAllRoutes] = useState<string[]>([])
   const [schema, setSchema] = useState<Schema | null>(null)
   const [coef, setCoef] = useState<Coef>(DEFAULT_COEF)
+  const [settings, setSettings] = useState<Settings | null>(null)
+  const [settingsRev, setSettingsRev] = useState(0)
   const [stages, setStages] = useState<Stage[]>([])
   const [logs, setLogs] = useState<LogEvent[]>([])
   const [running, setRunning] = useState(false)
@@ -36,7 +38,7 @@ export default function App() {
   const openDrawer = useCallback((k: string | null) => {
     if (k) { if (window.location.hash !== `#${k}`) window.location.hash = k }
     else if (window.location.hash) history.pushState(null, '', window.location.pathname)
-    setDrawer(k)
+    setDrawer(k && pageOf(k))
     window.scrollTo(0, 0)
   }, [])
   useEffect(() => {
@@ -53,6 +55,21 @@ export default function App() {
     api<{ routes: RouteGeo[]; segments: Segment[]; all_routes?: string[]; schema?: Schema }>('/api/geo').then((g) => { setGeo(g.routes); setSegments(g.segments ?? []); setAllRoutes(g.all_routes ?? []); setSchema(g.schema ?? null) }).catch(() => undefined)
   }, [])
   useEffect(loadMeta, [loadMeta, version])
+
+  // настройки сервиса: коэффициенты, норматив и пороги — с сервера, общие для всех
+  const applySettings = useCallback((st: Settings) => {
+    Object.assign(TH, { soft: st.soft, free: st.free, freeTarget: st.free_target })
+    setSettings(st)
+    setCoef(st.coef)
+    setSettingsRev((v) => v + 1)
+  }, [])
+  useEffect(() => { api<Settings>('/api/settings').then(applySettings).catch(() => undefined) }, [applySettings, version, metaError])
+  const saveSettings = useCallback(async (st: Settings) => {
+    const { coef: c, norm_scale, soft, free, free_target } = st
+    applySettings(await api<Settings>('/api/settings', undefined, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coef: c, norm_scale, soft, free, free_target }) }))
+  }, [applySettings])
+  const resetSettings = useCallback(async () => { applySettings(await api<Settings>('/api/settings/reset', undefined, { method: 'POST' })) }, [applySettings])
   useEffect(() => { if (metaError) { const t = setTimeout(loadMeta, 2000); return () => clearTimeout(t) } }, [metaError, loadMeta])
 
   const { connected } = useSocket<any>('/ws/pipeline', (ev) => {
@@ -65,24 +82,36 @@ export default function App() {
     }
   })
 
-  const ctx = useMemo(() => ({ meta, geo, segments, allRoutes, schema, coef, setCoef, stages, logs, running, pipelineConnected: connected, version, go: openDrawer }),
-    [meta, geo, segments, allRoutes, schema, coef, stages, logs, running, connected, version, openDrawer])
+  // ветки без истории (сейчас — №5: в данных ни одной успешной валидации) не показываем в выборе и не открываем
+  const geoActive = useMemo(() => (meta ? geo.filter((g) => meta.routes.find((r) => r.route === g.route)?.active !== false) : geo), [meta, geo])
+  const ctx = useMemo(() => ({ meta, geo: geoActive, segments, allRoutes, schema, coef, settings, saveSettings, resetSettings, settingsRev,
+    stages, logs, running, pipelineConnected: connected, version, go: openDrawer }),
+  [meta, geoActive, segments, allRoutes, schema, coef, settings, saveSettings, resetSettings, settingsRev, stages, logs, running, connected, version, openDrawer])
   const d = drawer ? PAGES[drawer] : null
   const Page = d?.el
 
   return (
     <AppCtx.Provider value={ctx}>
-      <OpsScreen drawer={drawer} openDrawer={openDrawer} />
-      {metaError && !meta && <div className="float glass" style={{ bottom: 70, left: '50%', transform: 'translateX(-50%)', padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'center' }}><TriangleAlert size={16} /> {metaError}. Повторяю подключение…</div>}
-      {d && Page && (
+      <OpsScreen drawer={drawer} openDrawer={openDrawer} sideWide={!!d?.wide}
+        sidePage={d?.side && Page ? (
+          <div className="ops-side sd side-page">
+            <div className="sd-top">
+              <div className="sd-bar">
+                <button className="sd-close" onClick={() => openDrawer(null)} title="Закрыть (Esc)" aria-label="Закрыть"><X size={20} /></button>
+                <span className="sd-id"><span className="sd-name"><span className="t">{d.title}</span></span></span>
+              </div>
+            </div>
+            <div className="sd-body">
+              <div className="note side-sub">{d.sub}</div>
+              <Page key={drawer} />
+            </div>
+          </div>
+        ) : null} />
+      {metaError && !meta && d && !d.side && <div className="float glass" style={{ bottom: 70, left: '50%', transform: 'translateX(-50%)', padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'center' }}><TriangleAlert size={16} /> {metaError === OFFLINE ? `${OFFLINE}. Повторяю подключение…` : metaError}</div>}
+      {d && Page && !d.side && (
         <div className="page">
           <header className="page-bar">
             <button className="pb-back" onClick={() => openDrawer(null)} title="К карте (Esc)"><ArrowLeft size={16} /> Карта</button>
-            <nav className="pb-tabs">
-              {Object.entries(PAGES).map(([k, v]) => (
-                <button key={k} className={k === drawer ? 'on' : ''} onClick={() => openDrawer(k)}><v.icon size={15} strokeWidth={1.75} /><span>{v.title}</span></button>
-              ))}
-            </nav>
             {running && <span className="pb-run"><RefreshCw size={13} className="spin" /> пересборка модели</span>}
           </header>
           <main className="page-body">

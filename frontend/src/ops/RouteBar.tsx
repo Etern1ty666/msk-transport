@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { overLabel, type DayRoute, type RouteGeo } from '../api'
+import type { RouteGeo } from '../api'
 
 type Props = {
-  geo: RouteGeo[]; routes: DayRoute[]; hour: number
+  geo: RouteGeo[]
   selected: number | null; onSelect: (r: number | null) => void
   focused?: boolean // стрелки ← → сейчас листают маршруты
 }
 
 /** Номера маршрутов, по которым есть прогноз, — в постоянном порядке. */
-export default function RouteBar({ geo, routes, hour, selected, onSelect, focused }: Props) {
+export default function RouteBar({ geo, selected, onSelect, focused }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const [edge, setEdge] = useState({ l: false, r: false })
 
@@ -35,24 +35,14 @@ export default function RouteBar({ geo, routes, hour, selected, onSelect, focuse
     box.current?.querySelector('.rb-chip.on')?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' })
   }, [selected])
 
-  const chips = geo.map((g) => {
-    const r = routes.find((x) => x.route === g.route)
-    const idle = !r || r.vehicles[hour] === 0
-    const ratio = idle ? 0 : r!.ratio[hour]
-    return { g, idle, ratio, hot: ratio >= 1 }
-  })
-
   return (
     <div className={`float glass routebar ${edge.l ? 'fl' : ''} ${edge.r ? 'fr' : ''} ${focused ? 'kfocus' : ''}`}>
       <div className="rb-scroll" ref={box} onScroll={measure}>
-        {chips.map(({ g, idle, ratio, hot: h }) => (
-          // цвет кнопки — цвет маршрута; перегрузка (≥100% норматива) — красный мигающий маячок и «+N%» прямо на кнопке
-          <button key={g.route} className={`rb-chip ${selected === g.route ? 'on' : ''} ${h ? 'hot' : ''}`}
-            style={{ ['--c' as string]: g.color }}
-            title={`${g.name}${idle ? ' — нет выпуска в этот час' : ` — загрузка ${Math.round(ratio * 100)}%${h ? ' — перегрузка' : ''}`}`}
-            onClick={() => onSelect(selected === g.route ? null : g.route)}>
+        {geo.map((g) => (
+          // только выбор ветки: кнопка в цвет маршрута, выбранная — с обводкой
+          <button key={g.route} className={`rb-chip ${selected === g.route ? 'on' : ''}`} style={{ ['--c' as string]: g.color }}
+            title={g.name} onClick={() => onSelect(selected === g.route ? null : g.route)}>
             {g.route}
-            {h && <><em>{overLabel(ratio)}</em><i className="rb-led" /></>}
           </button>
         ))}
       </div>

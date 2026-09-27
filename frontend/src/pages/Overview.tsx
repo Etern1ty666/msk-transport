@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Area, Bar, BarChart, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fmt, LEVEL_COLORS, useApi, type Forecast } from '../api'
-import { axis, Card, CoefPanel, ErrorBox, Kpi, routeColor, tooltipStyle, useApp } from '../components'
+import { axis, Card, SettingsHint, ErrorBox, Kpi, routeColor, tooltipStyle, useApp } from '../components'
 
 type Rec = { route: number; hour: number; boardings: number; vehicles: number; per_vehicle: number; load_ratio: number; level: string; extra_vehicles: number }
 
@@ -50,7 +50,7 @@ export default function Overview() {
             </ComposedChart>
           </ResponsiveContainer>
         </Card>
-        <CoefPanel />
+        <SettingsHint />
       </div>
 
       <div className="grid g3">

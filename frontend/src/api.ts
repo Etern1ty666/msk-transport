@@ -49,6 +49,8 @@ export type SystemMetrics = {
 }
 
 export class ApiError extends Error {}
+/** Сервер не ответил (сеть или 502/503/504 от прокси) — запрос стоит повторить. */
+export const OFFLINE = 'Сервер не отвечает'
 
 export async function api<T>(path: string, params?: Record<string, unknown>, init?: RequestInit): Promise<T> {
   const url = new URL(path, window.location.origin)
@@ -59,8 +61,9 @@ export async function api<T>(path: string, params?: Record<string, unknown>, ini
   try {
     res = await fetch(url.toString().replace(window.location.origin, ''), init)
   } catch {
-    throw new ApiError('Сервер недоступен — проверьте, что backend запущен')
+    throw new ApiError(OFFLINE)
   }
+  if ([502, 503, 504].includes(res.status)) throw new ApiError(OFFLINE)
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new ApiError(body.error ?? `Ошибка ${res.status}`)
   return body as T
@@ -90,6 +93,58 @@ export function useApi<T>(path: string | null, params?: Record<string, unknown>)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
   return { data, error, loading }
+}
+
+/** Сдвиг даты YYYY-MM-DD на n суток. */
+export const shiftDate = (d: string, n: number) => {
+  const t = new Date(`${d}T12:00:00Z`)
+  t.setUTCDate(t.getUTCDate() + n)
+  return t.toISOString().slice(0, 10)
+}
+
+/** Общий кэш суток (/api/day) для главного экрана и ленты времени: один запрос на день, готовые дни — сразу,
+ *  соседние дни подгружаются заранее — переход через полночь без ожидания сервера. */
+const dayReq = new Map<string, Promise<DayView>>()
+const dayReady = new Map<string, DayView>()
+export function fetchDay(date: string, params: Record<string, unknown>): Promise<DayView> {
+  const key = date + JSON.stringify(params)
+  let p = dayReq.get(key)
+  if (!p) {
+    p = api<DayView>('/api/day', { date, ...params })
+    dayReq.set(key, p)
+    p.then((d) => dayReady.set(key, d)).catch(() => dayReq.delete(key))
+    if (dayReq.size > 240) { const old = dayReq.keys().next().value!; dayReq.delete(old); dayReady.delete(old) }
+  }
+  return p
+}
+export const readyDay = (date: string, params: Record<string, unknown>) => dayReady.get(date + JSON.stringify(params)) ?? null
+
+/** Сутки для экрана: готовые из кэша отдаются сразу; пока новые грузятся — остаются прежние (без мигания);
+ *  следом подгружаются соседние дни. */
+export function useDay(date: string, params: Record<string, unknown>, range?: { min: string; max: string }) {
+  const pk = JSON.stringify(params)
+  const [last, setLast] = useState<{ key: string; data: DayView } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  const cached = readyDay(date, params)
+  useEffect(() => {
+    let alive = true
+    let timer: number | undefined
+    fetchDay(date, params)
+      .then((d) => { if (alive) { setLast({ key: date + pk, data: d }); setError(null) } })
+      .catch((e: Error) => {
+        if (!alive) return
+        setError(e.message)
+        if (e.message === OFFLINE) timer = window.setTimeout(() => setRetry((n) => n + 1), 2000)
+      })
+    for (const k of [1, -1, 2]) {
+      const d = shiftDate(date, k)
+      if (!range || (d >= range.min && d <= range.max)) fetchDay(d, params).catch(() => undefined)
+    }
+    return () => { alive = false; window.clearTimeout(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, pk, retry])
+  return { data: cached ?? last?.data ?? null, loading: !cached, error }
 }
 
 /** WebSocket с автопереподключением. */
@@ -180,14 +235,18 @@ export function problemWindows(r: DayRoute, thr = 1.0) {
   return out
 }
 
-/** Выше этой загрузки ветке уже предлагаем свободные вагоны (если перегруженным хватает). */
-export const SOFT = 0.8
-/** Донор отдаёт вагоны, только если сам остаётся не выше этой доли норматива во все часы окна —
- *  не выше порога «предложить вагоны», чтобы донор сам не стал кандидатом. */
-export const DONOR_MAX = SOFT
-/** Сколько вагонов добавить, чтобы в час h загрузка стала не выше SOFT. */
+/** Настройки сервиса (страница «Настройки»), сохраняются на сервере и общие для всех. */
+export type Settings = {
+  coef: Coef; norm_scale: number; soft: number; free: number; free_target: number
+  defaults?: Omit<Settings, 'defaults' | 'norm_base'>; norm_base?: Record<string, number>
+}
+/** Пороги рекомендаций по вагонам — из настроек (подставляются при загрузке, см. App):
+ *  soft — выше этой загрузки ветке предлагаем свободные вагоны (если перегруженным хватает; донор тоже остаётся не выше неё);
+ *  free — ниже этой загрузки вагоны можно снять; freeTarget — после снятия загрузка не выше этой. */
+export const TH = { soft: 0.8, free: 0.5, freeTarget: 0.7 }
+/** Сколько вагонов добавить, чтобы в час h загрузка стала не выше порога soft. */
 export const softExtra = (r: DayRoute, h: number) =>
-  r.vehicles[h] > 0 ? Math.max(0, Math.ceil(r.boardings[h] / (SOFT * r.norm)) - Math.floor(r.vehicles[h])) : 0
+  r.vehicles[h] > 0 ? Math.max(0, Math.ceil(r.boardings[h] / (TH.soft * r.norm)) - Math.floor(r.vehicles[h])) : 0
 export type VehicleSource =
   | { kind: 'depot'; place: string; name: string; avail: number; take: number; own: boolean }
   | { kind: 'route'; route: number; color: string; place: string; own: boolean; avail: number; take: number; before: number; after: number }
@@ -208,7 +267,7 @@ export function vehicleVariants(r: DayRoute, list: DayRoute[], depots: Record<st
   }
   for (const x of list) {
     if (x.route === r.route || !x.place || hours.some((h) => x.vehicles[h] <= 0 || x.extra[h] > 0)) continue
-    const avail = Math.min(...hours.map((h) => Math.floor(Math.floor(x.vehicles[h]) - x.boardings[h] / (DONOR_MAX * x.norm))))
+    const avail = Math.min(...hours.map((h) => Math.floor(Math.floor(x.vehicles[h]) - x.boardings[h] / (TH.soft * x.norm))))
     if (avail <= 0) continue
     const before = Math.max(...hours.map((h) => x.ratio[h]))
     cands.push({ kind: 'route', route: x.route, color: x.color, place: x.place, own: x.place === r.place, avail, take: 0, before, after: before })
@@ -268,15 +327,12 @@ export function vehicleVariants(r: DayRoute, list: DayRoute[], depots: Record<st
   return { plans: (full.length ? full : uniq.slice(0, 1)).slice(0, 3), reserved }
 }
 
-/** Ниже этой загрузки ветку можно разгрузить: снять лишние вагоны. */
-export const FREE = 0.5
-/** После снятия загрузка не выше этой доли норматива, а на линии остаётся не меньше половины вагонов (интервал не рвётся). */
-export const FREE_TARGET = 0.7
+// снять вагоны: ниже TH.free; после снятия загрузка не выше TH.freeTarget, а на линии остаётся не меньше половины вагонов (интервал не рвётся)
 /** Сколько вагонов можно снять в час h. */
 export const spareAt = (r: DayRoute, h: number) => {
   const v = Math.floor(r.vehicles[h])
-  if (v <= 0 || r.ratio[h] >= FREE) return 0
-  return Math.max(0, Math.min(v - Math.ceil(r.boardings[h] / (FREE_TARGET * r.norm)), Math.floor(v / 2)))
+  if (v <= 0 || r.ratio[h] >= TH.free) return 0
+  return Math.max(0, Math.min(v - Math.ceil(r.boardings[h] / (TH.freeTarget * r.norm)), Math.floor(v / 2)))
 }
 /** Окно «можно снять»: сейчас или со следующего часа, пока загрузка низкая; снимаем столько, сколько можно во все часы окна. */
 export function freeWindow(r: DayRoute, hour: number): { from: number; to: number; spare: number } | null {
@@ -302,7 +358,7 @@ export function freeVariants(r: DayRoute, list: DayRoute[], depots: Record<strin
   const park: FreeDest = { kind: 'depot', place: r.place, name: (r.place && depots?.[r.place]?.name) || 'парк', give: spare }
   const needs = list.filter((x) => x.route !== r.route && x.place).map((x) => {
     const run = hours.filter((h) => x.vehicles[h] > 0)
-    const need = Math.max(0, ...run.map((h) => (x.ratio[h] >= 1 ? x.extra[h] : x.ratio[h] >= SOFT ? softExtra(x, h) : 0)))
+    const need = Math.max(0, ...run.map((h) => (x.ratio[h] >= 1 ? x.extra[h] : x.ratio[h] >= TH.soft ? softExtra(x, h) : 0)))
     return { x, run, need, max: Math.max(0, ...run.map((h) => x.ratio[h])) }
   }).filter((n) => n.need > 0)
     .sort((a, b) => +(b.max >= 1) - +(a.max >= 1) || +(b.x.place === r.place) - +(a.x.place === r.place) || b.max - a.max)

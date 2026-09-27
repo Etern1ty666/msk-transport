@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Clock, Info, Route, ShieldCheck, TriangleAlert, Warehouse } from 'lucide-react'
-import { vehicleVariants, freeVariants, DONOR_MAX, FREE, FREE_TARGET, SOFT, type DayRoute, type Depot } from '../api'
+import { vehicleVariants, freeVariants, TH, type DayRoute, type Depot } from '../api'
 
 type Win = { from: number; to: number; extra: number }
 
@@ -51,13 +51,13 @@ export default function Fleet({ r, list, depots, win, hour, soft = false }: {
   const plan = plans[Math.min(pick, plans.length - 1)]
   const left = plan ? plan.left : need
   const note = `${home ? `${home.name}: за октябрь ${home.multi_route} из ${home.fleet} её вагонов работали на нескольких маршрутах. ` : ''}`
-    + `Готовые в парке = пиковый выпуск площадки (p90 будней) − вагоны на линии. Ветка-донор отдаёт вагоны, только если сама остаётся ≤ ${pct(DONOR_MAX)} норматива.`
+    + `Готовые в парке = пиковый выпуск площадки (p90 будней) − вагоны на линии. Ветка-донор отдаёт вагоны, только если сама остаётся ≤ ${pct(TH.soft)} норматива.`
   const short = (name: string) => name.replace(/^площадка\s+/i, '')
 
   return (
     <div className={`fplan ${soon ? 'soon' : 'now'} ${soft ? 'soft' : ''}`}>
       <div className="fp-head" title={`${soft
-        ? `${soon ? `Через ${win.from - hour} ч` : 'Сейчас'} загрузка выше ${pct(SOFT)} (${span(win)}): можно подогнать +${need} ${vag(need)} из свободных — было ${was}, станет ${was + need}. Перегруженным веткам вагоны оставлены.`
+        ? `${soon ? `Через ${win.from - hour} ч` : 'Сейчас'} загрузка выше ${pct(TH.soft)} (${span(win)}): можно подогнать +${need} ${vag(need)} из свободных — было ${was}, станет ${was + need}. Перегруженным веткам вагоны оставлены.`
         : `${soon ? `Через ${win.from - hour} ч` : 'Сейчас'} перегрузка ${span(win)}: нужно +${need} ${vag(need)} — было ${was}, станет ${was + need}`}\n\n${note}`}>
         <span className="fp-say need">{soon ? `Через ${win.from - hour} ч нужны вагоны` : 'Нужны вагоны'}: <b>+{need}</b></span>
       </div>
@@ -132,12 +132,12 @@ export function FreeFleet({ r, list, depots, win, hour }: {
   const soon = hour < win.from
   const was = Math.floor(r.vehicles[win.from])
   const short = (name: string) => name.replace(/^площадка\s+/i, '')
-  const note = `Загрузка ниже ${pct(FREE)} норматива: можно снять ${win.spare} ${vag(win.spare)} — после этого загрузка не выше ${pct(FREE_TARGET)}, `
-    + `а на линии остаётся не меньше половины вагонов. Сначала вагоны получают ветки, которым их не хватает (перегруженные, затем выше ${pct(SOFT)}), остальные уходят в парк.`
+  const note = `Загрузка ниже ${pct(TH.free)} норматива: можно снять ${win.spare} ${vag(win.spare)} — после этого загрузка не выше ${pct(TH.freeTarget)}, `
+    + `а на линии остаётся не меньше половины вагонов. Сначала вагоны получают ветки, которым их не хватает (перегруженные, затем выше ${pct(TH.soft)}), остальные уходят в парк.`
 
   return (
     <div className={`fplan free ${soon ? 'soon' : 'now'}`}>
-      <div className="fp-head" title={`${soon ? 'Через час' : 'Сейчас'} ${span(win)} загрузка ниже ${pct(FREE)}: можно снять ${win.spare} ${vag(win.spare)} — было ${was}, останется ${was - win.spare}\n\n${note}`}>
+      <div className="fp-head" title={`${soon ? 'Через час' : 'Сейчас'} ${span(win)} загрузка ниже ${pct(TH.free)}: можно снять ${win.spare} ${vag(win.spare)} — было ${was}, останется ${was - win.spare}\n\n${note}`}>
         <span className="fp-say ok">Вагоны не нужны{soon ? ` через ${win.from - hour} ч` : ''} — можно снять <b>{win.spare}</b></span>
       </div>
 
@@ -187,7 +187,7 @@ export function FleetCalm({ r, hour }: { r: DayRoute; hour: number }) {
   const run = r.vehicles.some((x, h) => h > hour && x > 0)
   return (
     <div className="fplan calm" title={v > 0
-      ? `Загрузка ${pct(r.ratio[hour])}: вагонов в самый раз — не нужно ни добавлять (до конца суток не выше ${pct(SOFT)}), ни снимать (не ниже ${pct(FREE)})`
+      ? `Загрузка ${pct(r.ratio[hour])}: вагонов в самый раз — не нужно ни добавлять (до конца суток не выше ${pct(TH.soft)}), ни снимать (не ниже ${pct(TH.free)})`
       : 'В этот час ветка не работает'}>
       <div className="fp-head">
         <span className="fp-say ok">{v > 0 ? 'Вагоны не нужны' : run ? 'Вагоны не нужны — нет выпуска' : 'Вагоны не нужны — выпуск окончен'}</span>
